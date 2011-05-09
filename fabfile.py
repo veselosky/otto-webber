@@ -1,6 +1,7 @@
 """Fabric tasks to automate my webserver infrastructure."""
 
 from fabric.api import *
+import fabric.contrib.files as remotefile
 
 # TODO boto tasks to bring EC2 servers up and down
 # TODO Configure an FTP Server.
@@ -44,7 +45,16 @@ def setup_server(servertype="FULLSTACK", mysqlpassword=None):
         with settings(warn_only=True):
             run('mysqladmin -u root password "%s"' % mysqlpassword)
 
-    # TODO Check out custom software/configs from a git repo into /usr/local somewhere.
+    # Check out otto from a git repo onto the server. Use your own fork if you
+    # want.
+    otto_repo = env.get('otto_repo', 'https://github.com/veselosky/otto-webber.git')
+    if remotefile.exists('/usr/local/share/otto-webber', verbose=True):
+        with cd('/usr/local/share/otto-webber'):
+            sudo('git pull')
+    else:
+        sudo('mkdir -p /usr/local/share')
+        with cd('/usr/local/share'):
+            sudo('git clone %s' % otto_repo)
 
 # TODO Task to set up a new user.
 def new_user(username):
