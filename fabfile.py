@@ -9,7 +9,7 @@ from fabric.api import *
 # 1. Assume Ubuntu 10.10 server base
 PACKAGES = {
     'ANYSERVER':
-        ['git', 'screen', 'tree', 'vim-nox'],
+        ['curl', 'git', 'screen', 'tree', 'vim-nox'],
     'WEBSERVER':
         ['apache2-mpm-worker', 'apache2.2-common', 'apache2-suexec-custom', 'libapache2-mod-fastcgi',
          'mysql-client-5.1',
@@ -23,23 +23,33 @@ PACKAGES['FULLSTACK'] = PACKAGES['WEBSERVER'] + PACKAGES['DATABASE']
 
 # TASKS
 
-def setup_server(servertype="FULLSTACK"):
+def setup_server(servertype="FULLSTACK", mysqlpassword=None):
     """Install and configure requisite system packages on a bare server."""
     sudo('apt-get -qy update')
     sudo('apt-get -qy upgrade')
     # Setting frontend to noninteractive prevents prompting for mysql server
     # root password. This means mysql server root password will be empty.
     # TODO Use debconf to set a mysql server root password.
-    sudo('DEBIAN_FRONTEND=noninteractive apt-get -qy install ' 
+    sudo('DEBIAN_FRONTEND=noninteractive apt-get -qy install '
         + ' '.join(PACKAGES['ANYSERVER'] + PACKAGES[servertype.upper()])
         )
-    # But until we can configure this beforehand, we'll do it after
-    run('mysqladmin -u root password "r00tp4ss"')
-    
+    # But until we can configure this beforehand, we'll do it after.
+    if not mysqlpassword:
+        try:
+            mysqlpassword = env.mysql.password
+        except AttributeError:
+            pass
+    if mysqlpassword:
+        # Note: If the password has already been set, this will fail.
+        with settings(warn_only=True):
+            run('mysqladmin -u root password "%s"' % mysqlpassword)
+
     # TODO Check out custom software/configs from a git repo into /usr/local somewhere.
-    # TODO Add a SKEL dir to custom config, so as not to disturb the system one.
 
 # TODO Task to set up a new user.
 def new_user(username):
     """Create a new user account."""
     pass
+
+# TODO Task to set up new Apache VirtualHost for a named user.
+# TODO Task to install Wordpress for a named user.
