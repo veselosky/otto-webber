@@ -25,7 +25,7 @@ PACKAGES['FULLSTACK'] = PACKAGES['WEBSERVER'] + PACKAGES['DATABASE']
 
 def setup_server(servertype="FULLSTACK", mysqlpassword=None):
     """Install and configure requisite system packages on a bare server."""
-    sudo('apt-get -qy update')
+    sudo('apt-get -qq update')
     sudo('apt-get -qy upgrade')
     # Setting frontend to noninteractive prevents prompting for mysql server
     # root password. This means mysql server root password will be empty.
