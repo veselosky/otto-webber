@@ -12,9 +12,9 @@ PACKAGES = {
     'ANYSERVER':
         ['curl', 'git', 'screen', 'tree', 'vim-nox'],
     'WEBSERVER':
-        ['apache2-mpm-worker', 'apache2.2-common', 'apache2-suexec-custom', 'libapache2-mod-fastcgi',
+        ['apache2-mpm-worker', 'apache2.2-common', 'apache2-suexec-custom', 'libapache2-mod-fcgid',
          'mysql-client-5.1',
-         'php5-cli', 'php5-fpm', 'php5-adodb', 'php5-gd', 'php5-imagick', 'php5-mysql', 'php5-suhosin', 'php-pear',
+         'php5-cli', 'php5-cgi', 'php5-adodb', 'php5-gd', 'php5-imagick', 'php5-mysql', 'php5-suhosin', 'php-pear',
          'python-mysqldb',
         ],
     'DATABASE':
