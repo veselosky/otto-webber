@@ -41,7 +41,8 @@ def setup_server(servertype="FULLSTACK", mysqlpassword=None):
         except AttributeError:
             pass
     if mysqlpassword:
-        # Note: If the password has already been set, this will fail.
+        # Note: If the password has already been set, this will fail, hence
+        # the "warn only".
         with settings(warn_only=True):
             run('mysqladmin -u root password "%s"' % mysqlpassword)
 
@@ -56,10 +57,10 @@ def setup_server(servertype="FULLSTACK", mysqlpassword=None):
         with cd('/usr/local/share'):
             sudo('git clone %s' % otto_repo)
 
-# TODO Task to set up a new user.
+# TODO Create & install /usr/local/sbin/adduser.local to customize user on creation.
 def new_user(username):
     """Create a new user account."""
-    pass
+    sudo('/usr/sbin/adduser --conf /usr/local/share/otto-webber/server/adduser.conf %s' % username)
 
 # TODO Task to set up new Apache VirtualHost for a named user.
 # TODO Task to install Wordpress for a named user.
