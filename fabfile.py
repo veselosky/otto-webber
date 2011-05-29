@@ -13,12 +13,14 @@ env['verbose'] = False
 # 1. Assume Ubuntu 10.10 server base
 PACKAGES = {
     'ANYSERVER':
-        ['build-essential', 'curl', 'git', 'screen', 'tree', 'vim-nox'],
+        ['build-essential', 'curl', 'git', 'python-dev', 'python-virtualenv',
+         'screen', 'tree', 'vim-nox'
+        ],
     'WEBSERVER':
         ['apache2-mpm-worker', 'apache2.2-common', 'apache2-suexec-custom', 'libapache2-mod-fcgid',
          'mysql-client-5.1',
          'php5-cli', 'php5-cgi', 'php5-adodb', 'php5-gd', 'php5-imagick', 'php5-mysql', 'php5-suhosin', 'php-pear',
-         'python-mysqldb','python-virtualenv',
+         'python-mysqldb',
         ],
     'DATABASE':
         ['mysql-server-5.1', 'mysql-client-5.1'],
