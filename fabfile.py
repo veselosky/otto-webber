@@ -13,7 +13,7 @@ env['verbose'] = False
 # 1. Assume Ubuntu 10.10 server base
 PACKAGES = {
     'ANYSERVER':
-        ['curl', 'git', 'screen', 'tree', 'vim-nox'],
+        ['build-essential', 'curl', 'git', 'screen', 'tree', 'vim-nox'],
     'WEBSERVER':
         ['apache2-mpm-worker', 'apache2.2-common', 'apache2-suexec-custom', 'libapache2-mod-fcgid',
          'mysql-client-5.1',
