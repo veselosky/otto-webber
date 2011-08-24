@@ -1,10 +1,12 @@
 """Fabric tasks to automate my webserver infrastructure."""
 
-from fabric.api import *
+from fabric.api import cd, env, run, settings, sudo
 import fabric.contrib.files as remotefile
+import otto.git as git
 
 env['ottohome'] = '/usr/local/share/otto-webber'
 env['verbose'] = False
+env.otto['git'] = {"remote_repo_path":"/home/vince/Repo/"}
 
 # TODO boto tasks to bring EC2 servers up and down
 # TODO Configure an FTP Server.
@@ -71,7 +73,7 @@ def install_otto(force_update=False):
     # Check out otto from a git repo onto the server. Use your own fork if you
     # want.
     otto_repo = env.get('otto_repo', 'https://github.com/veselosky/otto-webber.git')
-    _ensure_git_updated(env['ottohome'], otto_repo, use_sudo=True)
+    git.clone_or_update(env['ottohome'], otto_repo, use_sudo=True)
 
     # Create a python virtualenv where we will install otto's dependencies.
     venv = env['ottohome']+'/pyvenv'
@@ -86,7 +88,7 @@ def new_user(username):
     sudo('/usr/sbin/adduser --conf %s/server/adduser.conf %s' % (env['ottohome'], username))
 
 
-def setupmeup():
+def setmeup():
     """Setup otto-webber for an existing user.
 
     For now, can only setup the user who is executing the command, but that's a bug.
@@ -114,7 +116,7 @@ def remote_deploy(name, repo, branch='master'):
     # no longer be running.
 
     # check out the repo
-    _ensure_git_updated(install_path, repo, branch)
+    git.clone_or_update(install_path, repo, branch)
 
     # Run the local_deploy task for the fresh repo
     with cd(env['ottohome']):
@@ -136,26 +138,4 @@ def local_deploy(dir):
 def test_remotes():
     """Test how fab works"""
     run('ls ~/bin')
-
-##############################################################################
-# UTILITY FUNCTIONS
-##############################################################################
-
-def _ensure_git_updated(target,repo,branch='master',use_sudo=False):
-    """Ensure that a directory contains an up-to-date git clone.
-
-    `target` is the directory where the clone should live
-    `repo` is the git URL to clone if needed
-    `branch` is the branch to check out. Default 'master'.
-    `use_sudo` if True, git operations will be performed as superuser.
-    """
-    action = sudo if use_sudo else run
-    if remotefile.exists(target+'/.git', verbose=env['verbose']):
-        with cd(target):
-            action('git fetch && git checkout %s' % branch)
-    else:
-        action('mkdir -p %s' % target)
-        action('git clone %s %s' % (repo, target))
-        with cd(target):
-            action('git checkout %s' % branch)
 
