@@ -45,18 +45,21 @@ def setup_server(servertype="FULLSTACK", mysqlpassword=None):
     sudo('DEBIAN_FRONTEND=noninteractive apt-get -qy install '
         + ' '.join(SERVER_PACKAGES)
         )
-    # But until we can configure this beforehand, we'll do it after.
-    if not mysqlpassword:
+    # But until we can configure passwd beforehand, we'll do it after.
+    if 'mysql-server-5.1' in SERVER_PACKAGES:
         try:
-            mysqlpassword = env.mysql.password
+            mysqlpassword = mysqlpassword or env.mysql.password
         except AttributeError:
             pass
-    if mysqlpassword:
-        # Note: If the password has already been set, this will fail, hence
-        # the "warn only".
-        with settings(warn_only=True):
-            run('mysqladmin -u root password "%s"' % mysqlpassword)
-    install_otto()
+        if mysqlpassword:
+            # Note: If the password has already been set, this will fail, hence
+            # the "warn only".
+            with settings(warn_only=True):
+                run('mysqladmin -u root password "%s"' % mysqlpassword)
+
+    # install some python tools at the global level. Because I said so.
+    sudo('pip install fabric sphinx')
+
 
 def install_otto(force_update=False):
     """Install (or upgrade) the otto-webber code on a server.
