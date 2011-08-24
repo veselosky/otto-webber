@@ -13,15 +13,19 @@ env['verbose'] = False
 # 1. Assume Ubuntu 10.10 server base
 PACKAGES = {
     'ANYSERVER':
-        ['build-essential', 'curl', 'git', 'python-dev', 'python-virtualenv',
+        ['build-essential', 'curl', 'git', 'python-dev', 'python-pip', 'python-virtualenv',
          'screen', 'tree', 'vim-nox'
         ],
     'WEBSERVER':
-        ['apache2-mpm-worker', 'apache2.2-common', 'apache2-suexec-custom', 'libapache2-mod-fcgid',
+        ['apache2-mpm-worker', 'apache2.2-common', 'apache2-suexec-custom',
+         'libapache2-mod-fcgid', 'libapache2-mod-wsgi',
          'mysql-client-5.1',
-         'php5-cli', 'php5-cgi', 'php5-adodb', 'php5-gd', 'php5-imagick', 'php5-mysql', 'php5-suhosin', 'php-pear',
          'python-mysqldb',
          'libjpeg-progs', 'optipng', # image optimization tools for html5boilerplate build
+        ],
+    'PHP':
+        ['php5-cli', 'php5-cgi', 'php5-adodb', 'php5-gd', 'php5-imagick',
+         'php5-mysql', 'php5-suhosin', 'php-pear',
         ],
     'DATABASE':
         ['mysql-server-5.1', 'mysql-client-5.1'],
@@ -37,8 +41,9 @@ def setup_server(servertype="FULLSTACK", mysqlpassword=None):
     # Setting frontend to noninteractive prevents prompting for mysql server
     # root password. This means mysql server root password will be empty.
     # TODO Use debconf to set a mysql server root password.
+    SERVER_PACKAGES = PACKAGES['ANYSERVER'] + PACKAGES[servertype.upper()]
     sudo('DEBIAN_FRONTEND=noninteractive apt-get -qy install '
-        + ' '.join(PACKAGES['ANYSERVER'] + PACKAGES[servertype.upper()])
+        + ' '.join(SERVER_PACKAGES)
         )
     # But until we can configure this beforehand, we'll do it after.
     if not mysqlpassword:
