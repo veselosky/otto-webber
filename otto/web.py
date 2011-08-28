@@ -24,10 +24,11 @@ Set the following keys in your `env` to configure otto.web:
 """
 
 from datetime import datetime
-from fabric.api import  abort, cd, env, local, require, run, sudo, task
+from fabric.api import  abort, cd, env, lcd, local, put, require, run, sudo, task
 import fabric.contrib.files as remotefile
 from fabric.contrib.project import upload_project
 import os.path
+import os
 
 DEFAULT_CONFIG = {
     'otto.web.prefix': '/usr/local',
@@ -46,6 +47,17 @@ def _site_dir():
     return site_dir
 
 @task
+def setup():
+    """Prepare target directories on server."""
+    if env['otto.web.site_root'].startswith('/'):
+        site_root = env['otto.web.site_root']
+    else:
+        site_root = '%(otto.web.prefix)s/%(otto.web.site_root)s' % env
+    sudo('mkdir -p %s' % site_root)
+    sudo('chown %s. %s' % (env['user'], site_root))
+
+
+@task
 def stage():
     """Upload site content to web server."""
     require('otto.web.build_dir')
@@ -54,19 +66,21 @@ def stage():
 
     # Rename the local build dir to match to deploy_ts
     # Must remove trailing slash or os.path.dirname(x) returns x!
-    build_dir = env['otto.web.build_dir']
-    if build_dir.endswith('/'):
-        build_dir = build_dir[:-1]
-    dirname, basename = os.path.split(build_dir)
-    localname = os.path.join(dirname, deploy_ts)
-    local('mv %s %s' % (build_dir, localname))
+    build_dir = env['otto.web.build_dir'].rstrip(os.sep)
+    localdir, basename = os.path.split(build_dir)
+    with lcd(localdir):
+        local('mv %s %s' % (basename, deploy_ts))
+    tarfile = '%s.tar.gz' % deploy_ts
+    local('tar -czf %s -C %s %s' % (tarfile, localdir, deploy_ts))
 
     # Upload the content to the server.
-    upload_project(localname, site_dir)
-
-    # Update the "previous" and "current" links
+    run('mkdir -p %s' % site_dir)
+    put(tarfile, site_dir)
     with cd(site_dir):
+        run('tar --force-local -xzf %s' % tarfile)
         run("ln -sfn %s staged" % deploy_ts)
+        run('rm %s' % tarfile)
+
 
 @task
 def deploy():
