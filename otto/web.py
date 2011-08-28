@@ -26,7 +26,6 @@ Set the following keys in your `env` to configure otto.web:
 from datetime import datetime
 from fabric.api import  abort, cd, env, lcd, local, put, require, run, sudo, task
 import fabric.contrib.files as remotefile
-from fabric.contrib.project import upload_project
 import os.path
 import os
 
