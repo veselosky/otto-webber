@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <title>{{ channel.title }}</title>
+    {% set e = channel.entries[0] -%}
+    <updated>{{ e.updated or e.date or e._modified }}</updated>
+    <link rel="self" href="{{ FIXME }}" type="application/atom+xml"/>
+    <id>{{ FIXME }}</id>
+    <author>
+        <name>Vince Veselosky</name>
+    </author>
+    {% for entry in channel.entries -%}
+    <entry>
+        <title>{{ entry.title}}</title>
+        <summary type="text">{{ entry.summary }}</summary>
+        <link rel="alternate" href="{{ FIXME }}" type="text/html"/>
+        {% for topic in entry.topic_list -%}
+        <category term="{{ topic }}"/>
+        {% endfor -%}
+        <published>{{ entry.date or entry._modified }}</published>
+        <updated>{{ entry.updated or entry.date or entry._modified }}</updated>
+        <id>{{ FIXME }}</id>
+        <content type='html'>{{ entry.content }}</content>
+    </entry>
+    {% endfor -%}
+</feed>
