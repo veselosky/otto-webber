@@ -70,11 +70,3 @@ def clone_or_update(target,repo,branch='master',use_sudo=False):
         with cd(target):
             action('git checkout %s' % branch)
 
-def check_settings():
-    """Just a test to see if otto has settings"""
-    if isinstance(env.otto, dict):
-        puts("ok env.otto does not throw error")
-    else:
-        puts("not ok I did something wrong: "+env.otto)
-
-    print env.otto['git']
