@@ -36,7 +36,7 @@ properly configured web server (Otto can help you configure your web server
 too). Web sites managed by Otto are highly scalable, because they contain
 mostly static files.
 
-If fact, you don't even have to install Otto on your web server! You can use
+In fact, you don't even have to install Otto on your web server! You can use
 Otto on your development machine to manage a static web site remotely.
 However, Otto does include a suite of server-side software to turn your web
 site into a true web application. Where possible, server-side code executes in
