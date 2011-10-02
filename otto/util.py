@@ -1,4 +1,5 @@
 import codecs
+import json
 import os.path
 
 def ancestor_of(startfrom, containing):
@@ -24,4 +25,25 @@ def dump(text, filename):
     """Write unicode `text` to `filename` with UTF-8 encoding."""
     with codecs.open(filename, 'w', 'utf-8') as f:
         f.write(text)
+
+def strip_private_keys(fromdict):
+    """Return a shallow copy of the passed dictionary with "private" keys
+    removed (where private keys begin with an underscore)."""
+    save_copy = {}
+    for k,v in fromdict.iteritems():
+        if k.startswith('_'):
+            continue
+        save_copy[k] = v
+    return save_copy
+
+class Encoder(json.JSONEncoder):
+    def default(self, o):
+        if hasattr(o, 'isoformat'):
+            return o.isoformat()
+        else:
+            return super(Encoder, self).default(o)
+
+def json_dump(this, outpath):
+    """Save a dict as JSON to the `outfile` using UTF-8 encoding, removing "private" keys."""
+    dump(json.dumps(strip_private_keys(this), ensure_ascii=False, cls=Encoder), outpath)
 

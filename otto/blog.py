@@ -24,12 +24,26 @@ import json
 import markdown
 import os
 import os.path
-from otto.util import ancestor_of, slurp, dump
+from otto.util import ancestor_of, slurp, dump, json_dump
 
 DATETIME_FIELDS = ['created', 'date', 'published', 'updated']
 
+def load_channel(path, base_dir, base_url):
+    """Return a channel dict loaded from the given path"""
+    filename = path
+    if os.path.isdir(filename):
+        filename = os.path.join(filename, 'channel.json')
+    if not os.path.exists(filename):
+        raise ValueError('Cannot load channel from non-existent path "%s"' % filename)
+    channel = json.loads(slurp(filename))
+    channel['_filename'] = filename
+    channel['_dirname'] = os.path.dirname(filename)
+    channel['_path'] = os.path.relpath(channel['_dirname'], base_dir)
+    channel['_url'] = base_url if channel['_path'] == '.' else base_url+channel['_path']+'/'
+    return channel
+
 def load_entry_markdown(filename):
-    """Return an instance of a configured Markdown converter."""
+    """Return an entry dict loaded from the given path."""
     basename, ext = os.path.splitext(filename)
     channel_dir = ancestor_of(filename, containing='channel.json')
     md = markdown.Markdown(
@@ -43,46 +57,26 @@ def load_entry_markdown(filename):
     # thing claims to be a list.
     entry = {}
     for k,v in metadata.iteritems():
-        if len(v) == 1 and not k.endswith('list'):
+        if len(v) == 1 and not k.endswith('_list'):
             entry[k] = v[0]
         else:
             entry[k] = v
         # For any fields containing datetimes, ensure they are fully qualified
-        # RFC3339 formatted strings.
+        # RFC3339 formatted strings (input is likely to contain date only with
+        # no timezone info, e.g. '2011-09-30').
         if k in DATETIME_FIELDS:
             default = datetime.now(tz.gettz()).replace(hour=0,minute=0,second=0,microsecond=0)
             dt = dateparser.parse(entry[k], default=default)
             entry[k] = dt.isoformat()
 
-    entry['path'] = os.path.relpath(basename, channel_dir)
     entry['content'] = body
 
+    # These properties are contextual, therefore calculated and not stored.
     mtime = datetime.utcfromtimestamp(os.path.getmtime(filename)).isoformat()+'Z'
     entry['_modified'] = mtime
     entry['_filename'] = filename
-    entry['_channel'] = load_channel(channel_dir)
+    entry['_path'] = os.path.relpath(basename, channel_dir)
     return entry
-
-def load_channel(path):
-    """Return a channel dict loaded from the given path"""
-    filename = path
-    if os.path.isdir(filename):
-        filename = os.path.join(filename, 'channel.json')
-    if not os.path.exists(filename):
-        raise ValueError('Cannot load channel from non-existent path "%s"' % filename)
-    channel = json.loads(slurp(filename))
-    channel['_filename'] = filename
-    return channel
-
-def json_dump(this, outpath):
-    """Save a dict as JSON to the `outfile` using UTF-8 encoding, removing "private" keys."""
-    save_copy = {}
-    for k,v in this.iteritems():
-        if k.startswith('_'):
-            continue
-        save_copy[k] = v
-    dump(json.dumps(save_copy, ensure_ascii=False), outpath)
-
 
 @fabtask
 def build_blog(blogdir):
@@ -93,6 +87,8 @@ def build_blog(blogdir):
     # All the directories and paths we will need for ins and outs
     build_dir = os.path.join(env['otto.web.build_dir'], 'htdocs', blogname)
     template_dir = env['otto.web.template_dir']
+    # FIXME Assumes protocol is not https
+    blog_url = 'http://%s/%s/' % (env['otto.web.site'], blogname)
 
     test_root = os.path.dirname(env['real_fabfile'])
     with lcd(test_root):
@@ -102,6 +98,9 @@ def build_blog(blogdir):
     jinja = Environment(loader=FileSystemLoader(template_dir))
 
     for thisdir, subdirs, files in os.walk(build_dir):
+        channel_dir = ancestor_of(thisdir, containing='channel.json')
+        channel = load_channel(channel_dir, build_dir, blog_url)
+        entries_for_channel.setdefault(channel['_filename'], [])
         for entryfile in files:
             if not entryfile.endswith('.md'):
                 continue
@@ -110,27 +109,26 @@ def build_blog(blogdir):
 
             # Load entry, Add to entrylist for its channel
             entry = load_entry_markdown(entrypath)
-            channel = entry['_channel']
-            entries_for_channel.setdefault(channel['_filename'], [])
             entries_for_channel[channel['_filename']].append(entry)
+
+            # TODO Abstraction around Formatters, so you can configure any kind
+            # of output using a plugin.
 
             # write JSON output
             json_dump(entry, outpath+'.json')
 
-            # Write HTML output (detail page)
-            # TODO Allow list of templates, each rendered in turn
-            # Entry or channel may specify a template
+            # Write HTML output (entry or channel may specify a template)
             template_name = entry.get('template', None) or \
-                entry['_channel'].get('entry_template', None) or \
+                channel.get('entry_template', None) or \
                 env['otto.blog.entry_template']
             template = jinja.get_template(template_name)
-            context = {'entry':entry, 'channel':entry['_channel']}
+            context = {'entry':entry, 'channel':channel}
             dump(template.render(context), outpath+'.html')
 
     # Now we've accumulated all the entries. Write the channel indexes.
     for channelfile, entries in entries_for_channel.iteritems():
-        outpath = os.path.join(os.path.dirname(channelfile), 'index')
-        channel = load_channel(channelfile)
+        channel = load_channel(channelfile, build_dir, blog_url)
+        outpath = os.path.join(channel['_dirname'], 'index')
 
         # sort entries reverse chrono
         entries.sort(key=lambda x: x.get('updated', None) or x.get('date', None) or x.get('_modified', 0), reverse=True)

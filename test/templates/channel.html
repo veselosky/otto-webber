@@ -9,7 +9,7 @@
 <body>
     <ul>
     {% for entry in channel.entries %}
-    <li><a href="{{ entry.path }}">{{ entry.title }}</a></li>
+    <li><a href="{{ entry._path }}.html">{{ entry.title }}</a></li>
     {% endfor %}
     </ul>
 </body>
