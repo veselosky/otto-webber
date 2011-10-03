@@ -96,7 +96,8 @@ def build_blog(blogdir):
         local('mkdir -p %s' % build_dir)
         local('cp -a %s %s' % (blogdir+'/', build_dir))
 
-    jinja = Environment(loader=FileSystemLoader(template_dir))
+    jinja = Environment(loader=FileSystemLoader(template_dir),
+            extensions=['jinja2.ext.loopcontrols', 'jinja2.ext.autoescape'])
 
     for thisdir, subdirs, files in os.walk(build_dir):
         channel_dir = ancestor_of(thisdir, containing='channel.json')
