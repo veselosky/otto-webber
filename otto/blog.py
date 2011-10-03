@@ -18,7 +18,7 @@ reformat these fields.
 
 from datetime import datetime
 from dateutil import tz, parser as dateparser
-from fabric.api import env, lcd, local, task as fabtask
+from fabric.api import env, lcd, local, require, task as fabtask
 from jinja2 import Environment, FileSystemLoader
 import json
 import markdown
@@ -85,6 +85,7 @@ def build_blog(blogdir):
     entries_for_channel = {} # blog can have multiple channels
 
     # All the directories and paths we will need for ins and outs
+    require('otto.web.build_dir', 'otto.web.template_dir', 'otto.web.site')
     build_dir = os.path.join(env['otto.web.build_dir'], 'htdocs', blogname)
     template_dir = env['otto.web.template_dir']
     # FIXME Assumes protocol is not https
@@ -130,8 +131,10 @@ def build_blog(blogdir):
         channel = load_channel(channelfile, build_dir, blog_url)
         outpath = os.path.join(channel['_dirname'], 'index')
 
+        def entry_sort_key(e):
+            return e.get('updated', None) or e.get('published', None) or e.get('date', None)
         # sort entries reverse chrono
-        entries.sort(key=lambda x: x.get('updated', None) or x.get('date', None) or x.get('_modified', 0), reverse=True)
+        entries.sort(key=entry_sort_key, reverse=True)
         channel['entries'] = entries
 
         # dump index.json
