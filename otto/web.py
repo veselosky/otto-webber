@@ -11,7 +11,7 @@ user who:
 Set the following keys in your `env` to configure otto.web:
 
 `otto.web.build_dir`
-    *Required.* The directory where your build task assembles the files to be
+    *Required.* The local directory where your build task assembles the files to be
     uploaded.
 
 `otto.web.site`
@@ -24,7 +24,8 @@ Set the following keys in your `env` to configure otto.web:
 """
 
 from datetime import datetime
-from fabric.api import  abort, cd, env, lcd, local, put, require, run, sudo, task
+from fabric.api import  abort, cd, env, hide, lcd, local, put, require, run, sudo, task
+from fabric import colors
 import fabric.contrib.files as remotefile
 import os.path
 import os
@@ -124,6 +125,22 @@ def clean_server():
         done
         echo "Cleaned old deployments."
         """)
+
+@task
+def list():
+    """List deployments available at the server"""
+    site_dir = _site_dir()
+    with cd(site_dir):
+        with hide('running', 'stdout'):
+            current = run('[ -e current ] && readlink current || echo None')
+            previous = run('[ -e previous ] && readlink previous || echo None')
+            staged = run('[ -e staged ] && readlink staged || echo None')
+            available = run('ls -d [0123456789]* | sort')
+
+        print colors.green("Current: %s" % current)
+        print colors.yellow("Staged: %s" % staged)
+        print colors.red("Previous: %s" % previous)
+        print "Available:\n%s" % available
 
 @task
 def reload_apache():
