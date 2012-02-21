@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
     name = "otto",
-    version = "0.01",
+    version = "0.02",
     packages = find_packages(),
     author = "Vince Veselosky",
     author_email = "vince@control-escape.com",
