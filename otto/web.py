@@ -111,7 +111,7 @@ def rollback():
         """)
 
 @task
-def clean_server():
+def cleanup():
     """Remove old unused deployments from server."""
     # TODO Smarter code so that any build that has a symlink is preserved.
     site_dir = _site_dir()
@@ -125,6 +125,7 @@ def clean_server():
         done
         echo "Cleaned old deployments."
         """)
+clean_server = cleanup # backward compat
 
 @task
 def list():
@@ -148,7 +149,7 @@ def reload_apache():
     sudo('/etc/init.d/apache2 reload')
 
 @task
-def enable_site():
+def install_vhost():
     """Install apache support for the virtual host."""
     require('otto.web.site')
     site_dir = _site_dir()
@@ -161,10 +162,12 @@ def enable_site():
     reload_apache()
 
 @task
-def disable_site():
+def remove_vhost(purge=None):
     """Remove apache support for the virtual host."""
     sudo("a2dissite %s" % env['otto.web.site'])
     reload_apache()
+    if purge != None:
+        run('rm /etc/apache2/sites-available/%s' % env['otto.web.site'])
     # ¿Physically remove the conf from sites-available?
 
 
