@@ -1,3 +1,4 @@
+# encoding: UTF-8
 """
 Root namespace for Otto Webber.
 
@@ -11,5 +12,5 @@ assumptions are::
 Deployment tools also assume a Debian-style Apache setup on the server.
 
 """
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
