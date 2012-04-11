@@ -50,5 +50,5 @@ def server_setup():
     """Test bootstrapping a server"""
     from otto.cm.ubuntu import Precise
     box = Precise()
-#    sudo(box.initial_setup)
+    sudo(box.initial_setup)
     sudo(box.install_components(['wsgi_server', 'solr_server']))
