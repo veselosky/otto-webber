@@ -32,7 +32,7 @@ import os
 
 DEFAULT_CONFIG = {
     'otto.web.prefix': '/usr/local',
-    'otto.web.site_root': 'share/apache2/sites', # relative to prefix
+    'otto.web.site_root': 'share/otto/sites', # relative to prefix
     'otto.web.site_dir': '%(otto.web.prefix)s/%(otto.web.site_root)s/%(otto.web.site)s',
     }
 for k, v in DEFAULT_CONFIG.iteritems():
@@ -46,15 +46,20 @@ def _site_dir():
         abort('Site directory is not absolute: "%s"' % site_dir)
     return site_dir
 
-@task
-def setup():
-    """Prepare target directories on server."""
+def _site_root():
+    """calculate site root (where otto lives on the server)"""
     if env['otto.web.site_root'].startswith('/'):
         site_root = env['otto.web.site_root']
     else:
         site_root = '%(otto.web.prefix)s/%(otto.web.site_root)s' % env
-    sudo('mkdir -p %s' % site_root)
-    sudo('chown %s. %s' % (env['user'], site_root))
+    return site_root
+
+
+@task
+def setup():
+    """Prepare target directories on server."""
+    sudo('mkdir -p %s' % _site_root())
+    sudo('chown %s. %s' % (env['user'], _site_root()))
 
 
 @task
@@ -114,6 +119,8 @@ def rollback():
 def cleanup():
     """Remove old unused deployments from server."""
     # TODO Smarter code so that any build that has a symlink is preserved.
+    # To get a list of builds with links:
+    # find . -maxdepth 1 -type l -print0 | xargs -0 readlink
     site_dir = _site_dir()
     with cd(site_dir):
         run("""
@@ -144,30 +151,39 @@ def list():
         print "Available:\n%s" % available
 
 @task
-def reload_apache():
-    """Force apache to reload its configuration."""
-    sudo('/etc/init.d/apache2 reload')
+def service(name, action):
+    """Run the service script on the server to start|stop|restart services"""
+    sudo('service %s %s' % (name, action))
 
 @task
-def install_vhost():
-    """Install apache support for the virtual host."""
+def install_etc():
+    """Install configurations included in the deployment.
+
+    WARNING: There is no safety check here. You can completely screw yourself.
+    """
+    current = '%s/current' % _site_dir()
+    with cd(current):
+        sudo("""find etc -type d -print0 | xargs -0 -I '{}' mkdir -p '/{}'
+        find etc -type f -print0 | xargs -0 -I '{}' ln -sf '%s/{}' '/{}'
+        """ % current)
+
+@task
+def enable_site(server="nginx"):
+    """Add the site to the web server's configuration"""
     require('otto.web.site')
-    site_dir = _site_dir()
     site = env['otto.web.site']
-
-    vhost_path = "%s/current/etc/apache2/vhost.d/%s" % (site_dir, site)
-    dest = '/etc/apache2/sites-available/'
-    sudo("cp %s %s" % (vhost_path, dest))
-    sudo("a2ensite %s" % site)
-    reload_apache()
+    available = '/etc/%s/sites-available/%s' % (server, site)
+    enabled = '/etc/%s/sites-enabled/%s' % (server, site)
+    if remotefile.exists(available):
+        sudo('ln -s %s %s' % (available, enabled))
+    service(server, 'reload')
 
 @task
-def remove_vhost(purge=None):
-    """Remove apache support for the virtual host."""
-    sudo("a2dissite %s" % env['otto.web.site'])
-    reload_apache()
-    if purge != None:
-        run('rm /etc/apache2/sites-available/%s' % env['otto.web.site'])
-    # ¿Physically remove the conf from sites-available?
-
-
+def disable_site(server="nginx"):
+    """Add the site to the web server's configuration"""
+    require('otto.web.site')
+    site = env['otto.web.site']
+    enabled = '/etc/%s/sites-enabled/%s' % (server, site)
+    if remotefile.exists(enabled):
+        sudo('rm %s' % enabled)
+    service(server, 'reload')
