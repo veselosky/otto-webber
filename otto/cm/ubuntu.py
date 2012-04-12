@@ -54,10 +54,21 @@ class Precise(object):
 
     @property
     def python_development(self):
-        """Setup for Python development"""
+        """Setup for Python development.
+
+        Python development/deployment should always use a virtualenv. I also include
+        several pre-built modules that can be a pain to compile due to system library
+        dependencies. You can use them by building your virtualenv with
+        `--system-site-packages`.
+        """
         pre = ''
         post = ''
-        pkgs = ['python-dev', 'python-pip', 'python-virtualenv', 'virtualenvwrapper']
+        pkgs = ['libxml2-dev', 'libxml2-utils', 'python-amqplib',
+                'python-anyjson', 'python-crypto', 'python-dateutil',
+                'python-dev', 'python-eventlet', 'python-gevent',
+                'python-greenlet', 'python-imaging', 'python-libxml2',
+                'python-lxml', 'python-pip', 'python-simplejson',
+                'python-virtualenv', 'python-yaml', 'virtualenvwrapper']
         return (pre, pkgs, post)
 
     @property
