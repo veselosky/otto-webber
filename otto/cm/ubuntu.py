@@ -99,7 +99,7 @@ class Precise(object):
         post = '''
         sed -i 's/NO_START=1/# NO_START=1/' /etc/default/jetty
         sed -i 's/^#JAVA_HOME=.*/JAVA_HOME=\/usr\/lib\/jvm\/java-6-openjdk-i386/' /etc/default/jetty
-        service jetty start
+        service jetty start || service jetty status
         '''
         return (pre, pkgs, post)
 
