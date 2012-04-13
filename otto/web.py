@@ -39,6 +39,9 @@ DEFAULT_CONFIG = {
 for k, v in DEFAULT_CONFIG.iteritems():
     env.setdefault(k, v)
 
+#######################################################################
+# Utility Functions
+#######################################################################
 def _site_dir():
     """calculate the site directory"""
     require('otto.web.site', 'otto.web.site_root', 'otto.web.site_dir')
@@ -55,7 +58,35 @@ def _site_root():
         site_root = '%(otto.home)s/%(otto.web.site_root)s' % env
     return site_root
 
+def _install_etc():
+    """Install files from the current build's etc/ into /etc/
 
+    Also remove stale links made by old builds. Used by deploy and rollback tasks."""
+    site_dir = _site_dir()
+    current = '%s/current' % site_dir
+    etclinks = '%s/.etclinks-created' % site_dir
+
+    # Install the newly deployed etc/ files. Record the links created so we can check
+    # them later.
+    with cd(current):
+        sudo("""find etc -type d -print0 | xargs -0 -I '{}' mkdir -p '/{}'
+        find etc -type f -print0 | xargs -0 -I '{}' ln -sf '%s/{}' '/{}'
+        """ % current)
+        with hide('stdout'):
+            run('find etc -type f >> %s' % etclinks)
+
+    # Check that all the links we have created still resolve (inluding links
+    # from previous builds)
+    if remotefile.exists(etclinks):
+        # readlink -e returns true even if the thing is not a link!
+        sudo("""for item in `sort %s | uniq`; do
+        readlink -e /$item || rm /$item
+        done
+        """ % etclinks)
+
+#######################################################################
+# Fab Tasks
+#######################################################################
 @task
 def setup():
     """Prepare target directories on server."""
@@ -99,7 +130,7 @@ def stage():
         # stage because the installed packages might be system-specific.
         run('[ -f "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s" ] && \
             virtualenv --system-site-packages "%(otto.web.deploy_ts)s/" && \
-            pip install -E "%(otto.web.deploy_ts)s" -r "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s"' % env)
+            pip install -q -E "%(otto.web.deploy_ts)s" -r "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s"' % env)
 
 
 @task
@@ -109,6 +140,7 @@ def deploy():
     site_dir = _site_dir()
     if not remotefile.exists(site_dir + '/staged'):
         abort("No staged build to deploy! Use the stage task first.")
+
     # Update the "previous" and "current" links
     with cd(site_dir):
         run("""
@@ -117,6 +149,8 @@ def deploy():
         fi
         """)
         run("ln -sfn `readlink staged` current && rm staged")
+    _install_etc()
+
 
 @task
 def rollback():
@@ -129,24 +163,29 @@ def rollback():
             ln -sfn `readlink current` rolledback
             ln -sfn `readlink previous` current
         """)
+    _install_etc()
+
 
 @task
 def cleanup():
-    """Remove old unused deployments from server."""
-    # TODO Smarter code so that any build that has a symlink is preserved.
-    # To get a list of builds with links:
-    # find . -maxdepth 1 -type l -print0 | xargs -0 readlink
+    """Remove old unused deployments from server.
+
+    Any build that has a symbolic link in this directory pointing to it will be preserved.
+    Also trims the database of /etc/ links created down to ones that currently exist."""
     site_dir = _site_dir()
+    etclinks = '%s/.etclinks-created' % site_dir
+
     with cd(site_dir):
-        run("""
-        current=`readlink current`
-        previous=`readlink previous`
-        staged=`readlink staged`
-        for dir in `ls`; do
-            [ $dir != "$current" ] && [ $dir != "$staged" ] && [ $dir != "$previous" ] && [ $dir != "current" ] && [ $dir != "staged" ] && [ $dir != "previous" ] && rm -rf $dir
+        run("""find . -maxdepth 1 -type l -print0 | xargs -0 -n 1 readlink > ../keeplist
+        for dir in `ls | grep -f ../keeplist -v`; do
+            [ ! -L $dir ] && rm -rf $dir
+        done
+        rm ../keeplist
+        for file in `sort %s | uniq`; do
+            [ -e /$file ] && echo $file >> %s
         done
         echo "Cleaned old deployments."
-        """)
+        """ % (etclinks, etclinks))
 clean_server = cleanup # backward compat
 
 @task
@@ -169,18 +208,6 @@ def list():
 def service(name, action):
     """Run the service script on the server to start|stop|restart services"""
     sudo('service %s %s' % (name, action))
-
-@task
-def install_etc():
-    """Install configurations included in the deployment.
-
-    WARNING: There is no safety check here. You can completely screw yourself.
-    """
-    current = '%s/current' % _site_dir()
-    with cd(current):
-        sudo("""find etc -type d -print0 | xargs -0 -I '{}' mkdir -p '/{}'
-        find etc -type f -print0 | xargs -0 -I '{}' ln -sf '%s/{}' '/{}'
-        """ % current)
 
 @task
 def enable_site(server="nginx"):
