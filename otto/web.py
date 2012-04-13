@@ -31,9 +31,10 @@ import os.path
 import os
 
 DEFAULT_CONFIG = {
-    'otto.web.prefix': '/usr/local',
-    'otto.web.site_root': 'share/otto/sites', # relative to prefix
-    'otto.web.site_dir': '%(otto.web.prefix)s/%(otto.web.site_root)s/%(otto.web.site)s',
+    'otto.home': '/usr/local/share/otto',
+    'otto.web.site_root': 'sites', # relative to otto.home
+    'otto.web.site_dir': '%(otto.home)s/%(otto.web.site_root)s/%(otto.web.site)s',
+    'otto.web.requirements_file': 'requirements.txt',
     }
 for k, v in DEFAULT_CONFIG.iteritems():
     env.setdefault(k, v)
@@ -51,23 +52,31 @@ def _site_root():
     if env['otto.web.site_root'].startswith('/'):
         site_root = env['otto.web.site_root']
     else:
-        site_root = '%(otto.web.prefix)s/%(otto.web.site_root)s' % env
+        site_root = '%(otto.home)s/%(otto.web.site_root)s' % env
     return site_root
 
 
 @task
 def setup():
     """Prepare target directories on server."""
+    sudo('mkdir -p %s' % env['otto.home'])
     sudo('mkdir -p %s' % _site_root())
-    sudo('chown %s. %s' % (env['user'], _site_root()))
+    # Is this chown even needed? -VV 2012-04-12T17:29
+    sudo('chown -R %s. %s' % (env['user'], env['otto.home']))
 
 
 @task
 def stage():
-    """Upload site content to web server."""
+    """Upload site content to web server.
+
+    If the package contains a requirements.txt file, Otto will also install a
+    Python virtualenv into the staged directory and install the requirements.
+    """
     require('otto.web.build_dir')
     site_dir = _site_dir()
-    deploy_ts = env['otto.web.deploy_ts'] = datetime.utcnow().isoformat()
+    # Changed from isodate() because colons in the path crashed virtualenv, and
+    # are a generally bad idea anyway.
+    deploy_ts = env['otto.web.deploy_ts'] = datetime.utcnow().strftime('%Y%m%d-%H%M%S.%f')
 
     # Rename the local build dir to match to deploy_ts
     # Must remove trailing slash or os.path.dirname(x) returns x!
@@ -75,16 +84,22 @@ def stage():
     localdir, basename = os.path.split(build_dir)
     with lcd(localdir):
         local('mv %s %s' % (basename, deploy_ts))
-    tarfile = '%s.tar.gz' % deploy_ts
-    local('tar -czf %s -C %s %s' % (tarfile, localdir, deploy_ts))
+        tarfile = '%s.tar.gz' % deploy_ts
+        local('tar -czf %s %s' % (tarfile, deploy_ts))
 
     # Upload the content to the server.
     run('mkdir -p %s' % site_dir)
-    put(tarfile, site_dir)
+    put(localdir+'/'+tarfile, site_dir)
     with cd(site_dir):
         run('tar --force-local -xzf %s' % tarfile)
         run("ln -sfn %s staged" % deploy_ts)
         run('rm %s' % tarfile)
+        # If a requirements file was installed, make the staged dir a virtualenv
+        # and install the requirements. NOTE: This cannot be done at the build
+        # stage because the installed packages might be system-specific.
+        run('[ -f "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s" ] && \
+            virtualenv --system-site-packages "%(otto.web.deploy_ts)s/" && \
+            pip install -E "%(otto.web.deploy_ts)s" -r "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s"' % env)
 
 
 @task

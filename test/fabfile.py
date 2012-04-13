@@ -9,7 +9,7 @@ env['verbose'] = True
 env['user'] = 'vagrant'
 env['password'] = 'vagrant'
 env['otto.web.site'] = 'example.com'
-env['otto.web.build_dir'] = './build'
+env['otto.web.build_dir'] = './build/out'
 env['otto.web.template_dir'] = './templates'
 env['otto.blog.entry_template'] = 'entry.html'
 env['otto.blog.channel_template'] = 'channel.html'
@@ -26,7 +26,8 @@ def build_site_skel():
     """First step of build, create the skeleton directory structure."""
     test_root = os.path.dirname(env['real_fabfile'])
     with lcd(test_root):
-        local('cp -a example.com %s' % env['otto.web.build_dir'])
+        local('mkdir -p %s' % env['otto.web.build_dir'])
+        local('cp -a example.com/ %s' % env['otto.web.build_dir'])
 
 @fabtask
 def clean():
@@ -51,4 +52,4 @@ def server_setup():
     from otto.cm.ubuntu import Precise
     box = Precise()
     sudo(box.initial_setup)
-    sudo(box.install_components(['wsgi_server', 'solr_server']))
+    sudo(box.install_components(['wsgi_server']))
