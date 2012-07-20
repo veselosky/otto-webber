@@ -42,3 +42,19 @@ However, Otto does include a suite of server-side software to turn your web
 site into a true web application. Where possible, server-side code executes in
 the background when changes are made, not when site visitors make a request.
 
+Current state as of 0.2.0
+========================================
+Most of the stuff in the repo is cruft and not used at the moment. The only
+really useful bit is `otto.web`, a library of Fabric tasks used to automate web
+deployments.
+
+
+
+
+
+
+
+
+
+
+
