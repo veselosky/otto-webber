@@ -42,16 +42,38 @@ However, Otto does include a suite of server-side software to turn your web
 site into a true web application. Where possible, server-side code executes in
 the background when changes are made, not when site visitors make a request.
 
-Current state as of 0.2.0
+Current state as of 0.3.0
 ========================================
-Most of the stuff in the repo is cruft and not used at the moment. The only
-really useful bit is `otto.web`, a library of Fabric tasks used to automate web
-deployments.
+Most of what you see here is in a purely experimental stage. The only really
+useful bit is `otto.web`, a library of Fabric tasks used to automate web
+deployments. The author uses it to deploy several production web sites. The
+author also uses `otto.cm` to help configure the web server where the sites are
+deployed. However, it's kindergarten stuff and probably not useful to anyone
+but Vince.
 
+The deployment code in `otto.web` is only suitable for static web sites. You
+are responsible for creating your own "build" task that will collect a local
+directory as you would like it to appear on the server. Otto then provides fab
+tasks for deploying to the server (or rolling back to a previous deployment).
+This makes it fairly simple to maintain a static HTML or Sphinx-built site in a
+git repo, requiring only a fabfile with a few lines of code to run the build.
 
+Raodmap
+========================================
+**Git push deployments.** Add Git hooks that will allow Otto to take action on
+changes pushed to the repo. This should allow a smoother deployment path more
+like Heroku, where "deploy" and "push" are synonymous. This requires server
+side code and per-site virtualenv support, so that Otto can run the build tasks
+at the server.
 
+**Incremental deployment.** Add the capability to deploy only files that have
+changed since the previous deployment, rather than rebuilding/redeploying the
+entire site. This will be necessary for large, rapidly growing sites.
 
-
+**Self-updating applications.** Add the ability for a server-side process to
+add content to the repository for a site, triggering an incremental deploy.
+This would allow for building a web-based CMS or a cron-based aggregator using
+Git as the backing store.
 
 
 
