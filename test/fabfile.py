@@ -66,4 +66,5 @@ def server_setup():
     from otto.cm.ubuntu import Precise
     box = Precise()
     sudo(box.initial_setup)
-    sudo(box.install_components(['wsgi_server']))
+    sudo(box.install_components(['apache_server']))
+
