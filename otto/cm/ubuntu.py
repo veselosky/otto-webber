@@ -38,7 +38,7 @@ class Lucid(object):
 class Precise(object):
     """Options for 12.04 Precise Pangolin.
 
-    Each of the component functions should return a 3-tuple of (pre, pkgs, post),
+    Each of the component properties should return a 3-tuple of (pre, pkgs, post),
     where pkgs is a list of OS packages to be installed, and pre and post are
     scripts to be run before and after the packages are installed. If no pre/post
     is desired, return an empty string, not None. (pre = '')
@@ -50,6 +50,15 @@ class Precise(object):
         pre = ''
         post = ''
         pkgs = ['build-essential', 'curl', 'git', 'less', 'screen', 'tree', 'vim-nox', 'wget']
+        return (pre, pkgs, post)
+
+    @property
+    def apache_server(self):
+        """Packages for Apache"""
+        pre = ''
+        # Some modules are installed but not enabled. I use these.
+        post = 'a2enmod include && service apache2 reload'
+        pkgs = ['apache2',]
         return (pre, pkgs, post)
 
     @property
