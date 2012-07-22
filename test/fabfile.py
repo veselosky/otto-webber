@@ -6,6 +6,8 @@ import otto.blog as blog
 import otto.web as web
 
 env['verbose'] = True
+env['use_ssh_config'] = True
+env['hosts'] = ['vagrant']
 env['user'] = 'vagrant'
 env['password'] = 'vagrant'
 env['otto.web.site'] = 'example.com'
@@ -13,6 +15,18 @@ env['otto.web.build_dir'] = './build/out'
 env['otto.web.template_dir'] = './templates'
 env['otto.blog.entry_template'] = 'entry.html'
 env['otto.blog.channel_template'] = 'channel.html'
+
+@fabtask
+def vagrant_ssh_test_config():
+    """Adds the "vagrant" host config to your ~/.ssh/config file
+
+    For recent versions of Vagrant, standard base box no longer supports
+    password authentication. This task adds a "vagrant" host config to your
+    local `~/.ssh/config` file. It will not replace an existing "vagrant" host,
+    so you may need to edit it manually if you do this a lot.
+    """
+    local('grep -q "Host vagrant" ~/.ssh/config || vagrant ssh-config --host vagrant >> ~/.ssh/config')
+
 
 @fabtask
 def build():
