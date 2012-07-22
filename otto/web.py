@@ -18,6 +18,11 @@ Set the following keys in your `env` to configure otto.web:
     *Required.* The domain name of the site Otto will be manipulating. This
     name is used to construct several paths on the remote server.
 
+`otto.web.httpserver`
+    *Optional.* Default="apache2". The name of your HTTP server. Used by
+    `enable_vhost` and `disable_vhost` as the name of the service to restart,
+    and the name of the directory to manipulate under `/etc/`.
+
 .. TODO:
 
     Document optional keys for constructing `site_dir`.
@@ -35,6 +40,7 @@ DEFAULT_CONFIG = {
     'otto.web.site_root': 'sites', # relative to otto.home
     'otto.web.site_dir': '%(otto.home)s/%(otto.web.site_root)s/%(otto.web.site)s',
     'otto.web.requirements_file': 'requirements.txt',
+    'otto.web.httpserver': 'apache2',
     }
 for k, v in DEFAULT_CONFIG.iteritems():
     env.setdefault(k, v)
@@ -125,12 +131,15 @@ def stage():
         run('tar --force-local -xzf %s' % tarfile)
         run("ln -sfn %s staged" % deploy_ts)
         run('rm %s' % tarfile)
-        # If a requirements file was installed, make the staged dir a virtualenv
-        # and install the requirements. NOTE: This cannot be done at the build
+        # TODO If a requirements file was installed, make the staged dir a virtualenv
+        # and install the requirements.
+
+        # NOTE This cannot be done at the build
         # stage because the installed packages might be system-specific.
-        run('[ -f "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s" ] && \
-            virtualenv --system-site-packages "%(otto.web.deploy_ts)s/" && \
-            pip install -q -E "%(otto.web.deploy_ts)s" -r "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s"' % env)
+        # FIXME Using test on remote causes fabric to throw an error because its return status is false.
+#        run('[ -f "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s" ] && \
+#            virtualenv --system-site-packages "%(otto.web.deploy_ts)s/" && \
+#            pip install -q -E "%(otto.web.deploy_ts)s" -r "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s"' % env)
 
 
 @task
@@ -210,10 +219,11 @@ def service(name, action):
     sudo('service %s %s' % (name, action))
 
 @task
-def enable_site(server="nginx"):
+def enable_site():
     """Add the site to the web server's configuration"""
-    require('otto.web.site')
+    require('otto.web.site', 'otto.web.httpserver')
     site = env['otto.web.site']
+    server = env['otto.web.httpserver']
     available = '/etc/%s/sites-available/%s' % (server, site)
     enabled = '/etc/%s/sites-enabled/%s' % (server, site)
     if remotefile.exists(available):
@@ -221,11 +231,13 @@ def enable_site(server="nginx"):
     service(server, 'reload')
 
 @task
-def disable_site(server="nginx"):
+def disable_site():
     """Add the site to the web server's configuration"""
-    require('otto.web.site')
+    require('otto.web.site', 'otto.web.httpserver')
     site = env['otto.web.site']
+    server = env['otto.web.httpserver']
     enabled = '/etc/%s/sites-enabled/%s' % (server, site)
     if remotefile.exists(enabled):
         sudo('rm %s' % enabled)
     service(server, 'reload')
+
