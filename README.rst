@@ -58,7 +58,7 @@ tasks for deploying to the server (or rolling back to a previous deployment).
 This makes it fairly simple to maintain a static HTML or Sphinx-built site in a
 git repo, requiring only a fabfile with a few lines of code to run the build.
 
-Raodmap
+Roadmap
 ========================================
 **Git push deployments.** Add Git hooks that will allow Otto to take action on
 changes pushed to the repo. This should allow a smoother deployment path more
