@@ -1,8 +1,0 @@
-Your Apache vhost files go here.
-
-RULES:
-
-1. Future releases of Otto will not alter any file in this dir except README.
-2. Your vhost files must end in .conf or they will not be used.
-3. ALL directives in these files MUST be contained within <VirtualHost> tags.
-
