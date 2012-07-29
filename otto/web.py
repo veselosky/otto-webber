@@ -23,9 +23,7 @@ Set the following keys in your `env` to configure otto.web:
     `enable_vhost` and `disable_vhost` as the name of the service to restart,
     and the name of the directory to manipulate under `/etc/`.
 
-.. TODO:
-
-    Document optional keys for constructing `site_dir`.
+.. TODO: Document optional keys for constructing `site_dir`.
 """
 
 from datetime import datetime
@@ -93,6 +91,8 @@ def _install_etc():
 #######################################################################
 # Fab Tasks
 #######################################################################
+# TODO 0.4 expand `setup` to create server-side otto, install git hooks.
+# TODO 0.4 Maybe move `setup` out of `otto.web`?
 @task
 def setup():
     """Prepare target directories on server."""
@@ -102,6 +102,7 @@ def setup():
     sudo('chown -R %s. %s' % (env['user'], env['otto.home']))
 
 
+# TODO 0.4 `stage` should merge to local staging branch, then push.
 @task
 def stage():
     """Upload site content to web server.
@@ -142,6 +143,7 @@ def stage():
 #            pip install -q -E "%(otto.web.deploy_ts)s" -r "%(otto.web.deploy_ts)s/%(otto.web.requirements_file)s"' % env)
 
 
+# TODO 0.4 `deploy` should merge to local deploy branch, then push.
 @task
 def deploy():
     """Make your staged site content "live"."""
@@ -161,6 +163,7 @@ def deploy():
     _install_etc()
 
 
+# TODO 0.4 `rollback` should rollback the local deploy branch & push
 @task
 def rollback():
     """Undo deployment, roll back to the previous deploy."""
@@ -175,6 +178,7 @@ def rollback():
     _install_etc()
 
 
+# TODO 0.4 Is `cleanup` still needed? What should it do?
 @task
 def cleanup():
     """Remove old unused deployments from server.
@@ -213,6 +217,8 @@ def list():
         print colors.red("Previous: %s" % previous)
         print "Available:\n%s" % available
 
+
+# TODO 0.4 `service` is not web-specific. Move out of `otto.web'
 @task
 def service(name, action):
     """Run the service script on the server to start|stop|restart services"""
