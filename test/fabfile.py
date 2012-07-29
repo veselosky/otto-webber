@@ -4,6 +4,7 @@ import os
 import os.path
 import otto.blog as blog
 import otto.web as web
+from otto.util import project_dir
 
 env['verbose'] = True
 env['use_ssh_config'] = True
@@ -38,16 +39,14 @@ def build():
 @fabtask
 def build_site_skel():
     """First step of build, create the skeleton directory structure."""
-    test_root = os.path.dirname(env['real_fabfile'])
-    with lcd(test_root):
+    with lcd(project_dir()):
         local('mkdir -p %s' % env['otto.web.build_dir'])
         local('cp -a example.com/ %s' % env['otto.web.build_dir'])
 
 @fabtask
 def clean():
     """make clean"""
-    test_root = os.path.dirname(env['real_fabfile'])
-    with lcd(test_root):
+    with lcd(project_dir()):
         local('rm -rf build')
 
 @fabtask

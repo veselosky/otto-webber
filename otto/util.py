@@ -1,6 +1,11 @@
 import codecs
 import json
 import os.path
+from fabric.api import env
+
+def project_dir():
+    """Return the path the to project directory (assumed to be the dir containing the fabfile.py)."""
+    return os.path.dirname(env['real_fabfile'])
 
 def ancestor_of(startfrom, containing):
     """Return the path to the ancestor directory of `startfrom` that contains a file or subdir called `containing`. If not found, returns None."""
