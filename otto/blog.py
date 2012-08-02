@@ -85,11 +85,11 @@ def build_blog(blogdir):
     entries_for_channel = {} # blog can have multiple channels
 
     # All the directories and paths we will need for ins and outs
-    require('otto.web.build_dir', 'otto.web.template_dir', 'otto.web.site')
-    build_dir = os.path.join(env['otto.web.build_dir'], 'htdocs', blogname)
-    template_dir = env['otto.web.template_dir']
+    require('otto.build_dir', 'otto.template_dir', 'otto.site')
+    build_dir = os.path.join(env['otto.build_dir'], 'htdocs', blogname)
+    template_dir = env['otto.template_dir']
     # FIXME Assumes protocol is not https
-    blog_url = 'http://%s/%s/' % (env['otto.web.site'], blogname)
+    blog_url = 'http://%s/%s/' % (env['otto.site'], blogname)
 
     test_root = os.path.dirname(env['real_fabfile'])
     with lcd(test_root):

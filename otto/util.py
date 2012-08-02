@@ -3,10 +3,52 @@ import json
 import os.path
 from fabric.api import env
 
-def project_dir():
-    """Return the path the to project directory (assumed to be the dir containing the fabfile.py)."""
-    return os.path.dirname(env['real_fabfile'])
+########################################################################
+# Used everywhere
+########################################################################
+class paths(object):
+    """Class to provide easy access to interpolated paths for Otto."""
 
+    @staticmethod
+    def home(*args):
+        return os.path.join(env['otto.home'], *args)
+
+    @staticmethod
+    def hooks(*args):
+        return os.path.join(env['otto.home'], env['otto.path.hooks'], *args)
+
+    @staticmethod
+    def deployments(*args):
+        return os.path.join(env['otto.home'], env['otto.path.deployments'], *args)
+
+    @staticmethod
+    def repos(*args):
+        return os.path.join(env['otto.home'], env['otto.path.repos'], *args)
+
+    @staticmethod
+    def sites(*args):
+        return os.path.join(env['otto.home'], env['otto.path.sites'], *args)
+
+    @staticmethod
+    def virtualenvs(*args):
+        return os.path.join(env['otto.home'], env['otto.path.virtualenvs'], *args)
+
+    @staticmethod
+    def workspace(*args):
+        return os.path.join(env['otto.home'], env['otto.path.workspace'], *args)
+
+    @staticmethod
+    def project_dir(*args):
+        """Return the path the to project directory (assumed to be the dir containing the fabfile.py)."""
+        return os.path.join(os.path.dirname(env['real_fabfile']), *args)
+
+    @staticmethod
+    def site_dir(*args):
+        return os.path.join(env['otto.home'], env['otto.path.sites'], env['otto.site'], *args)
+
+########################################################################
+# Functions for blog.py
+########################################################################
 def ancestor_of(startfrom, containing):
     """Return the path to the ancestor directory of `startfrom` that contains a file or subdir called `containing`. If not found, returns None."""
     target_dir = startfrom
