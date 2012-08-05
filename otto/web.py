@@ -25,80 +25,45 @@ Set the following keys in your `env` to configure otto:
 
 """
 
-from datetime import datetime
 from fabric.api import  abort, cd, env, hide, lcd, local, put, require, run, sudo, task
 from fabric import colors
 import fabric.contrib.files as remotefile
 import os.path
-import os
+import otto.git as git
 from otto.util import paths
 from otto.server import service, install_etc
 
 #######################################################################
 # Fab Tasks
 #######################################################################
-# TODO 0.4 `stage` should merge to local staging branch, then push.
+# TODO 0.4 `stage` still untested
 @task
 def stage():
-    """Upload site content to web server.
+    """Tag the staging branch and push it to the Otto server.
 
-    If the package contains a requirements.txt file, Otto will also install a
-    Python virtualenv into the staged directory and install the requirements.
+    At the server, Otto will run the build task and install the build to the staging area.
     """
-    require('otto.build_dir')
-    site_dir = paths.site_dir()
-    # Changed from isodate() because colons in the path crashed virtualenv, and
-    # are a generally bad idea anyway.
-    deploy_ts = env['otto.deploy_ts'] = datetime.utcnow().strftime('%Y%m%d-%H%M%S.%f')
-
-    # Rename the local build dir to match to deploy_ts
-    # Must remove trailing slash or os.path.dirname(x) returns x!
-    build_dir = env['otto.build_dir'].rstrip(os.sep)
-    localdir, basename = os.path.split(build_dir)
-    with lcd(localdir):
-        local('mv %s %s' % (basename, deploy_ts))
-        tarfile = '%s.tar.gz' % deploy_ts
-        local('tar -czf %s %s' % (tarfile, deploy_ts))
-
-    # Upload the content to the server.
-    run('mkdir -p %s' % site_dir)
-    put(localdir+'/'+tarfile, site_dir)
-    with cd(site_dir):
-        run('tar --force-local -xzf %s' % tarfile)
-        run("ln -sfn %s staged" % deploy_ts)
-        run('rm %s' % tarfile)
-        # TODO If a requirements file was installed, make the staged dir a virtualenv
-        # and install the requirements.
-
-        # NOTE This cannot be done at the build
-        # stage because the installed packages might be system-specific.
-        # FIXME Using test on remote causes fabric to throw an error because its return status is false.
-#        run('[ -f "%(otto.deploy_ts)s/%(otto.requirements_file)s" ] && \
-#            virtualenv --system-site-packages "%(otto.deploy_ts)s/" && \
-#            pip install -q -E "%(otto.deploy_ts)s" -r "%(otto.deploy_ts)s/%(otto.requirements_file)s"' % env)
+    git.tag('otto-staged', env['otto.git.staging_branch'], force=True)
+    git.push(env['otto.git.staging_branch'])
 
 
-# TODO 0.4 `deploy` should merge to local deploy branch, then push.
+# TODO 0.4 `deploy` shuffles tags vs symlinks. Still untested.
 @task
 def deploy():
     """Make your staged site content "live"."""
-    # TODO Support deployment of named builds by passing name arg.
+    # TODO Check that the otto-staged tag exists. Cannot deploy without it.
     site_dir = paths.site_dir()
     if not remotefile.exists(site_dir + '/staged'):
         abort("No staged build to deploy! Use the stage task first.")
 
-    # Update the "previous" and "current" links
-    with cd(site_dir):
-        run("""
-        if [ -L current ]; then
-            ln -sfn `readlink current` previous
-        fi
-        """)
-        run("ln -sfn `readlink staged` current && rm staged")
-    install_etc()
+    git.tag('otto-previous', 'otto-deployed', force=True)
+    git.tag('otto-deployed', 'otto-staged', force=True)
+
+    # Needs to move to the post-receive hook
+    # install_etc()
 
 
-# TODO 0.4 `rollback` should rollback the local deploy branch & push
+# TODO 0.4 `rollback` needs to shuffle tags vs symlinks.
 @task
 def rollback():
     """Undo deployment, roll back to the previous deploy."""
@@ -113,6 +78,7 @@ def rollback():
     install_etc()
 
 
+# TODO 0.4 Do we still need a `cleanup` with git tags?
 @task
 def cleanup():
     """Remove old unused deployments from server.
@@ -135,6 +101,7 @@ def cleanup():
         """ % (etclinks, etclinks))
 clean_server = cleanup # backward compat
 
+# TODO 0.4 Does `list` still make sense with git tags?
 @task
 def list():
     """List deployments available at the server"""

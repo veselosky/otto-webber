@@ -1,6 +1,8 @@
 import codecs
 import json
 import os.path
+
+from datetime import datetime
 from fabric.api import env
 
 ########################################################################
@@ -43,8 +45,16 @@ class paths(object):
         return os.path.join(os.path.dirname(env['real_fabfile']), *args)
 
     @staticmethod
+    def build_dir(*args):
+        return os.path.realpath(env['otto.build_dir'])
+
+    @staticmethod
     def site_dir(*args):
         return os.path.join(env['otto.home'], env['otto.path.sites'], env['otto.site'], *args)
+
+
+def make_timestamp():
+    return datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 
 ########################################################################
 # Functions for blog.py

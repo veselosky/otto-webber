@@ -42,13 +42,14 @@ exist on the server into the `otto.build_dir`. Test it locally to ensure
 everything works. You can add the build dir to your .gitignore, you won't need
 to check the completed files into git.
 
-When you're ready, execute `fab web.stage` to upload your site to Otto's
-server-side repository. Otto will merge your site into the local "staging"
-branch and then push it. Git hooks will execute on the server to deploy your
-site to the staging area where you can give it one final check.
+When you're ready, merge your changes into your local staging branch ("master"
+by default). Then execute `fab otto.push` to upload your site to Otto's
+server-side repository. Otto will create a tag and push your staged changes to
+the server. Git hooks on the server will see the change and deploy your site to
+the staging area where you can give it one final check.
 
-When you are ready, execute `fab web.deploy`. Otto will tag the staging branch
-and rsync your staged site to the deployment area.
+When you are ready, execute `fab web.deploy`. Otto will rsync your staged site
+to the deployment area.
 """
 __version__ = '0.4.0'
 
@@ -64,7 +65,9 @@ DEFAULT_CONFIG = {
     'otto.path.workspace': 'workspace', # relative to otto.home
     'otto.requirements_file': 'requirements.txt',
     'otto.httpserver': 'apache2',
+    'otto.git.staging_branch': 'master',
     }
 for k, v in DEFAULT_CONFIG.iteritems():
     env.setdefault(k, v)
 
+# TODO 0.4 Need to create hook scripts that do the actual build/deploy/rollback

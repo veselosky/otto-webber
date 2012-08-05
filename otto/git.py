@@ -8,7 +8,7 @@ from fabric.api import cd, env, hide, local, run, settings
 import fabric.contrib.files as remotefile
 import os
 import os.path
-from otto.util import paths as home
+from otto.util import paths, make_timestamp
 
 ########################################################################
 # Main exported functions
@@ -37,13 +37,26 @@ def push(branch='--all', remote="otto"):
     local("git push %s %s" % (branch, remote))
 
 
+# TODO 0.4 `tag` still untested
+def tag(tagname=None, target=None, force=False):
+    """Create a tag"""
+    local("git rev-parse --git-dir")
+    args = ''
+    if tagname == None:
+        tagname = make_timestamp()
+    if target == None:
+        target = env['otto.git.staging_branch']
+    if force:
+        args += ' -f '
+    local("git tag %s %s %s" % (args, tagname, target))
+
+
 def clone_or_update(target, repo, branch='master'):
     """Ensure that a directory contains an up-to-date git clone.
 
     `target` is the directory where the clone should live
     `repo` is the git URL to clone if needed
     `branch` is the branch to check out. Default 'master'.
-    `use_sudo` if True, git operations will be performed as superuser.
     """
     if remotefile.exists(target+'/.git', verbose=env['verbose']):
         with cd(target):
@@ -60,10 +73,10 @@ def clone_or_update(target, repo, branch='master'):
 ########################################################################
 def get_remote_repo_path():
     """Construct the path of the remote repo."""
-    repo = os.path.basename(home.project_dir())
+    repo = os.path.basename(paths.project_dir())
     if not repo.endswith('.git'):
         repo = repo+'.git'
-    return home.repos(repo)
+    return paths.repos(repo)
 
 
 def ensure_remote_repo(target):
