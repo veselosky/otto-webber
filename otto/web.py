@@ -12,7 +12,7 @@ Set the following keys in your `env` to configure otto:
 
 `otto.build_dir`
     *Required.* The local directory where your build task assembles the files to be
-    uploaded.
+    uploaded. MUST be relative to the project root (where the fabfile lives).
 
 `otto.site`
     *Required.* The domain name of the site Otto will be manipulating. This
