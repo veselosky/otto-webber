@@ -3,12 +3,13 @@
 Utilities and fabric tasks for working with git.
 
 """
-
 from fabric.api import cd, env, hide, local, run, settings
 import fabric.contrib.files as remotefile
 import os
 import os.path
-from otto.util import paths, make_timestamp
+import re
+
+from otto.util import paths
 
 ########################################################################
 # Main exported functions
@@ -34,21 +35,31 @@ def push(branch='--all', remote="otto"):
             local("git remote add %s git+ssh://%s%s" % (remote, env.host_string, target))
 
     ensure_remote_repo(target)
-    local("git push %s %s" % (branch, remote))
+    local("git push --tags %s %s" % (branch, remote))
 
 
-# TODO 0.4 `tag` still untested
-def tag(tagname=None, target=None, force=False):
-    """Create a tag"""
-    local("git rev-parse --git-dir")
-    args = ''
-    if tagname == None:
-        tagname = make_timestamp()
-    if target == None:
-        target = env['otto.git.staging_branch']
-    if force:
-        args += ' -f '
-    local("git tag %s %s %s" % (args, tagname, target))
+def local_modifications():
+    """Return a list of working copy modifications, parsed from "git status --porcelain".
+
+    Returns None if none found (rather than an empty list).
+
+    Example return value:
+
+        [('M', 'file1.py'), ('A', 'file2.py'), ('D', 'file3.py')]
+    """
+    with settings(hide('warnings'), warn_only=True):
+        # if grep finds something it returns true. We want to invert the logic.
+        check = local("git status --porcelain | grep -v ??", capture=True)
+        if check.succeeded:
+            return re.findall('(?P<status>\w+)\s+(?P<file>.*)', check)
+        else:
+            return None
+
+
+def list_tags(pattern=''):
+    """List all tags matching `pattern`. Returns a Python list."""
+    tags = local("git tag -l %s | sort -r" % pattern, capture=True)
+    return re.split('\s+', tags)[:-1] # trailing newline makes empty last item
 
 
 def clone_or_update(target, repo, branch='master'):
@@ -86,5 +97,4 @@ def ensure_remote_repo(target):
         git_check = run("git rev-parse --git-dir")
         if git_check.failed:
             run("git --bare init")
-
 

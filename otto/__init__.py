@@ -30,12 +30,16 @@ Add a `fabfile.py` to your repo. Otto requires that you set the following
 variables in fabric's `env`.
 
 * `otto.build_dir` - the local path where your build task will place its output.
-* `otto.site` - the domain name of the web site in this repo. Used in file paths and templates.
+* `otto.site` - the domain name of the web site in this repo. Used in file
+  paths and templates.
 
 Other env variables you may care about have default values, but may be overridden.
 
-* `otto.home` - the path where the Otto environment is set up on the server. Defaults to `/usr/local/share/otto`.
-* `otto.httpserver` - which web server you run. Defaults to "apache2". Any web server that follows Debian setup conventions should work. "nginx" is known to work.
+* `otto.home` - the path where the Otto environment is set up on the server.
+  Defaults to `/usr/local/share/otto`.
+* `otto.httpserver` - which web server you run. Defaults to "apache2". Any web
+  server that follows Debian setup conventions should work. "nginx" is known to
+  work.
 
 In your fabfile, create a `build` task that assembles your web site as it will
 exist on the server into the `otto.build_dir`. Test it locally to ensure

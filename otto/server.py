@@ -22,6 +22,7 @@ def service(name, action):
     sudo('service %s %s' % (name, action))
 
 
+# TODO 0.4 install_etc must be called from post-receive hook. Changes?
 def install_etc():
     """Install files from the current build's etc/ into /etc/
 
