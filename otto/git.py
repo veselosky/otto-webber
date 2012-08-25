@@ -14,7 +14,7 @@ from otto.util import paths
 ########################################################################
 # Main exported functions
 ########################################################################
-def push(branch='--all', remote="otto"):
+def push(branch='--tags', remote="otto"):
     """Pushes to the "otto" remote repo.
 
     If no "otto" remote exists for the current repo, it is added using the Otto settings.
@@ -35,7 +35,7 @@ def push(branch='--all', remote="otto"):
             local("git remote add %s git+ssh://%s%s" % (remote, env.host_string, target))
 
     ensure_remote_repo(target)
-    local("git push --tags %s %s" % (branch, remote))
+    local("git push %s %s" % (branch, remote))
 
 
 def local_modifications():
@@ -58,8 +58,8 @@ def local_modifications():
 
 def list_tags(pattern=''):
     """List all tags matching `pattern`. Returns a Python list."""
-    tags = local("git tag -l %s | sort -r" % pattern, capture=True)
-    return re.split('\s+', tags)[:-1] # trailing newline makes empty last item
+    tags = local("git tag -l '%s' | sort -r" % pattern, capture=True)
+    return re.split('\s+', tags)
 
 
 def clone_or_update(target, repo, branch='master'):
