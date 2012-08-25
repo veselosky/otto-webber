@@ -20,10 +20,6 @@ class paths(object):
         return os.path.join(env['otto.home'], env['otto.path.hooks'], *args)
 
     @staticmethod
-    def deployments(*args):
-        return os.path.join(env['otto.home'], env['otto.path.deployments'], *args)
-
-    @staticmethod
     def repos(*args):
         return os.path.join(env['otto.home'], env['otto.path.repos'], *args)
 
@@ -46,7 +42,7 @@ class paths(object):
 
     @staticmethod
     def build_dir(*args):
-        return os.path.realpath(env['otto.build_dir'])
+        return os.path.join(os.path.realpath(env['otto.build_dir']), *args)
 
     @staticmethod
     def site_dir(*args):
