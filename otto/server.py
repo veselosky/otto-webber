@@ -10,10 +10,10 @@ def setup():
     """Prepare target directories on server."""
     sudo('mkdir -p %s' % env['otto.home'])
     sudo('chown -R %(user)s. %(otto.home)s' % env)
-    run('mkdir -p %s' % paths.deployments())
     run('mkdir -p %s' % paths.hooks())
     run('mkdir -p %s' % paths.repos())
     run('mkdir -p %s' % paths.sites())
+    run('mkdir -p %s' % paths.virtualenvs())
     run('mkdir -p %s' % paths.workspace())
 
 
