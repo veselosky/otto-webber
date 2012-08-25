@@ -24,24 +24,20 @@ Set the following keys in your `env` to configure otto:
     and the name of the directory to manipulate under `/etc/`.
 
 """
-from fabric.api import  env, local, require, sudo, task
+__all__ = ['cleanup', 'deploy', 'golive', 'list', 'rollback']
+from fabric.api import abort, env, execute, local, require, sudo, task
 import fabric.contrib.files as remotefile
 
 import otto.git as git
 from otto.util import make_timestamp
-from otto.server import service
-
-# Notes on post-receive hook:
-# build()
-# rsync to deploy dir
-# install_etc()
+from otto.server import install_etc, service
 
 #######################################################################
 # Fab Tasks
 #######################################################################
 # FIXME Default target should be env[staging_branch] bidgaf
 @task
-def deploy(target='master'):
+def deploy(target=None):
     """Make your staged site content "live".
 
     Otto creates a new tag on the staging branch (master by default) using the
@@ -56,13 +52,13 @@ def deploy(target='master'):
     build task to generate output to the staging area. It will then rsync the
     built files from the staging area to the deployment area.
     """
-    # FIXME Produce reasonable output if local modifications on deploy
-    mods = git.local_modifications()
-    if mods != None:
-        raise Exception("Local modifications!")
+    if target == None:
+        target = env['otto.git.staging_branch']
+        mods = git.local_modifications()
+        if mods != None:
+            abort("Local modifications! Specify a tag to deploy or check in your workspace.")
 
     tagname = "otto-" + make_timestamp()
-    git.tag(tagname, target, force=True)
     local('git tag -f %s %s' % (tagname, target))
     git.push()
 
@@ -71,14 +67,15 @@ def deploy(target='master'):
 def rollback(to=None):
     """Undo deployment, roll back to the previous deploy."""
     if to == None:
-        to = git.tag_list('otto-*')[1] # 2nd most recent
+        to = git.list_tags('otto-*')[1] # 2nd most recent
     deploy(to)
 
 
 @task
 def cleanup():
     """Remove old deployment tags (retains 3 most recent)."""
-    tags = git.tag_list('otto-*')[3:]
+    tags = git.list_tags('otto-*')[3:]
+    print 'TAGS: '.join(tags)
     if tags:
         local('git tag -d ' + ' '.join(tags))
 
@@ -104,7 +101,7 @@ def enable_site():
 
 @task
 def disable_site():
-    """Add the site to the web server's configuration"""
+    """Remove the site from the web server's configuration"""
     require('otto.site', 'otto.httpserver')
     site = env['otto.site']
     server = env['otto.httpserver']
@@ -112,4 +109,16 @@ def disable_site():
     if remotefile.exists(enabled):
         sudo('rm %s' % enabled)
     service(server, 'reload')
+
+@task
+def golive():
+    """Push the built site to the web servers.
+
+    Normally this will be called by Otto's git hooks, so there's no need to
+    call it yourself. However, if you disable the git hooks for some reason, or
+    need to push code live from your local machine, you could use this task.
+    """
+    # TODO 0.4 rsync files to the host
+    execute(install_etc)
+    execute(enable_site)
 
