@@ -61,7 +61,6 @@ from fabric.api import env
 
 DEFAULT_CONFIG = {
     'otto.home': '/usr/local/share/otto',
-    'otto.path.deployments': 'deployments', # relative to otto.home
     'otto.path.hooks': 'hooks', # relative to otto.home
     'otto.path.repos': 'repos', # relative to otto.home
     'otto.path.sites': 'sites', # relative to otto.home
@@ -74,4 +73,3 @@ DEFAULT_CONFIG = {
 for k, v in DEFAULT_CONFIG.iteritems():
     env.setdefault(k, v)
 
-# TODO 0.4 Need to create hook scripts that do the actual build/deploy/rollback
