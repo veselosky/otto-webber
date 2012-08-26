@@ -21,7 +21,10 @@ class paths(object):
 
     @staticmethod
     def repos(*args):
-        return os.path.join(env['otto.home'], env['otto.path.repos'], *args)
+        repo = os.path.join(env['otto.home'], env['otto.path.repos'], *args)
+        if not repo.endswith('.git'):
+            repo += '.git'
+        return repo
 
     @staticmethod
     def sites(*args):
@@ -37,7 +40,7 @@ class paths(object):
 
     @staticmethod
     def project_dir(*args):
-        """Return the path the to project directory (assumed to be the dir containing the fabfile.py)."""
+        """Return the path to the project directory (the dir containing the fabfile.py)."""
         return os.path.join(os.path.dirname(env['real_fabfile']), *args)
 
     @staticmethod

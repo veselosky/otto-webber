@@ -28,8 +28,8 @@ def install_etc():
 
     Also remove stale links made by old builds. Used by deploy and rollback tasks."""
     site_dir = paths.site_dir()
-    current = '%s/current' % site_dir
-    etclinks = '%s/.etclinks-created' % site_dir
+    current = site_dir
+    etclinks = paths.site_dir('.etclinks-created')
 
     # Install the newly deployed etc/ files. Record the links created so we can check
     # them later.
