@@ -25,11 +25,12 @@ Set the following keys in your `env` to configure otto:
 
 """
 __all__ = ['cleanup', 'deploy', 'golive', 'list', 'rollback']
-from fabric.api import abort, env, execute, local, require, sudo, task
+from fabric.api import abort, cd, env, execute, local, prefix, require, run, sudo, task
 import fabric.contrib.files as remotefile
+import os.path
 
 import otto.git as git
-from otto.util import make_timestamp
+from otto.util import make_timestamp, paths
 from otto.server import install_etc, service
 
 #######################################################################
@@ -61,6 +62,30 @@ def deploy(target=None):
     tagname = "otto-" + make_timestamp()
     local('git tag -f %s %s' % (tagname, target))
     git.push()
+    # Fuck it, I'll do the work here instead of in a hook.
+    # Check out the tag into the workspace
+    basename = os.path.basename(paths.project_dir())
+    remote_repo = paths.repos(basename)
+    workspace = paths.workspace(basename)
+    git.clone_or_update(workspace, remote_repo)
+
+    with cd(workspace):
+        run('git reset --hard ' + tagname)
+
+        # Ensure the virtualenv has been built
+        checksum = run('md5sum requirements.txt | awk {print $1}')
+        virtualenv_path = paths.virtualenvs(checksum)
+        venv_activate = paths.virtualenvs(checksum, 'bin', 'activate')
+        if not remotefile.exists(venv_activate):
+            run('mkvirtualenv -r requirements.txt --system-site-packages ' + virtualenv_path)
+
+        # Activate the virtualenv and run the build task
+        with prefix('source ' + venv_activate):
+            run('fab build')
+
+        # rsync the built site into the site dir
+        # install_etc
+        # enable_vhost
 
 
 @task
