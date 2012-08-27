@@ -2,6 +2,22 @@ RELEASE NOTES
 =============
 Changes that may be backwards incompatible are noted with COMPAT.
 
+Release 0.4.0
+-------------
+* Otto now keeps a copy of your repository at the server.
+* web.stage now does a git push to Otto and runs "fab build" at the server.
+* COMPAT: otto.git has changed in major ways.
+  - create_origin has been removed.
+  - clone_or_update no longer accepts the "branch" or "use_sudo" arguments.
+  - lots of code added.
+* COMPAT: otto.web no longer exports all its fab tasks by default, only the
+  essential ones. Makes "fab -l" list less messy.
+* COMPAT: Several configuration keys have changed names. Pretty much all keys
+  have been moved from "otto.web.*" to "otto.*".
+* Tests are very difficult to accomplish in a subdirectory at this stage, since
+  the code easily confuses the otto-webber repo with the repo of the code that
+  should be using Otto. To be fixed, later.
+
 Release 0.3.0
 -------------
 * Started keeping release notes, even though the module has not officially been
