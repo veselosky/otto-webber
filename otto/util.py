@@ -2,6 +2,62 @@ import codecs
 import json
 import os.path
 
+from datetime import datetime
+from fabric.api import env
+
+########################################################################
+# Used everywhere
+########################################################################
+class paths(object):
+    """Class to provide easy access to interpolated paths for Otto."""
+
+    @staticmethod
+    def home(*args):
+        return os.path.join(env['otto.home'], *args)
+
+    @staticmethod
+    def hooks(*args):
+        return os.path.join(env['otto.home'], env['otto.path.hooks'], *args)
+
+    @staticmethod
+    def repos(*args):
+        repo = os.path.join(env['otto.home'], env['otto.path.repos'], *args)
+        if args and not repo.endswith('.git'):
+            repo += '.git'
+        return repo
+
+    @staticmethod
+    def sites(*args):
+        return os.path.join(env['otto.home'], env['otto.path.sites'], *args)
+
+    @staticmethod
+    def virtualenvs(*args):
+        return os.path.join(env['otto.home'], env['otto.path.virtualenvs'], *args)
+
+    @staticmethod
+    def workspace(*args):
+        return os.path.join(env['otto.home'], env['otto.path.workspace'], *args)
+
+    @staticmethod
+    def local_workspace(*args):
+        """Return the path to the project directory (the dir containing the fabfile.py)."""
+        return os.path.join(os.path.dirname(env['real_fabfile']), *args)
+
+    @staticmethod
+    def build_dir(*args):
+        return paths.local_workspace(env['otto.build_dir'], *args)
+
+    @staticmethod
+    def site_dir(*args):
+        return os.path.join(env['otto.home'], env['otto.path.sites'], env['otto.site'], *args)
+
+
+def make_timestamp():
+    return datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+
+########################################################################
+# Functions for blog.py
+########################################################################
 def ancestor_of(startfrom, containing):
     """Return the path to the ancestor directory of `startfrom` that contains a file or subdir called `containing`. If not found, returns None."""
     target_dir = startfrom

@@ -1,18 +1,20 @@
 from fabric.api import env, lcd, local, sudo, task as fabtask
-from fabric.colors import red, green, white
-import os
-import os.path
+from fabric.colors import green
 import otto.blog as blog
+import otto.git as git
+import otto.server as server
 import otto.web as web
+from otto.util import paths
 
 env['verbose'] = True
 env['use_ssh_config'] = True
 env['hosts'] = ['vagrant']
 env['user'] = 'vagrant'
 env['password'] = 'vagrant'
-env['otto.web.site'] = 'example.com'
-env['otto.web.build_dir'] = './build/out'
-env['otto.web.template_dir'] = './templates'
+env['otto.home'] = '/home/otto'
+env['otto.site'] = 'example.com'
+env['otto.build_dir'] = './build/out'
+env['otto.template_dir'] = './templates'
 env['otto.blog.entry_template'] = 'entry.html'
 env['otto.blog.channel_template'] = 'channel.html'
 
@@ -29,36 +31,36 @@ def vagrant_ssh_test_config():
 
 
 @fabtask
+def pre_tests():
+    """Run the automated test suite"""
+    with lcd(paths.project_dir()):
+        local('vagrant up') # server
+        server_setup() # CM config base box
+
+@fabtask
+def run_tests():
+    server.setup() # Install otto on server
+    git.push() # Upload repository to otto server
+    # Sadly, no hooks yet.
+
+@fabtask
 def build():
     """Build the site"""
     build_site_skel()
     blog.build_blog('./blog')
 
 
-@fabtask
 def build_site_skel():
     """First step of build, create the skeleton directory structure."""
-    test_root = os.path.dirname(env['real_fabfile'])
-    with lcd(test_root):
-        local('mkdir -p %s' % env['otto.web.build_dir'])
-        local('cp -a example.com/ %s' % env['otto.web.build_dir'])
+    with lcd(paths.project_dir()):
+        local('mkdir -p %s' % env['otto.build_dir'])
+        local('cp -a example.com/ %s' % env['otto.build_dir'])
 
 @fabtask
 def clean():
     """make clean"""
-    test_root = os.path.dirname(env['real_fabfile'])
-    with lcd(test_root):
+    with lcd(paths.project_dir()):
         local('rm -rf build')
-
-@fabtask
-def precise():
-    """Testing the Precise class"""
-    from otto.cm.ubuntu import Precise
-    box = Precise()
-    print('initial_setup: ' + green(box.initial_setup))
-    (pre, pkgs, post) = box.wsgi_server
-    print('wsgi_server: ' + green(' '.join(pkgs)))
-
 
 @fabtask
 def server_setup():
@@ -67,4 +69,15 @@ def server_setup():
     box = Precise()
     sudo(box.initial_setup)
     sudo(box.install_components(['apache_server']))
+
+@fabtask
+def dump():
+    from otto.cm.ubuntu import Precise
+    box = Precise()
+    print('initial_setup: ' + green(box.initial_setup))
+    (pre, pkgs, post) = box.wsgi_server
+    print('wsgi_server: ' + green(' '.join(pkgs)))
+    for key in sorted(env.keys()):
+        print "%s = %s" % (key, env[key])
+
 

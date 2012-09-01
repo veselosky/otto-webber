@@ -3,70 +3,96 @@
 Utilities and fabric tasks for working with git.
 
 """
-
-from fabric.api import abort, cd, env, local, puts, require, run, sudo, task
+from fabric.api import cd, env, hide, local, run, settings
 import fabric.contrib.files as remotefile
-import os
-import os.path
+import re
 
-@task
-def create_origin(repo=None):
-    """Create upstream origin repo from current local one."""
-    require('otto.git.remote_repo_path')
+from otto.util import paths
+
+########################################################################
+# Main exported functions
+########################################################################
+def push(branch='--all', remote="otto"):
+    """Pushes to the "otto" remote repo.
+
+    If no "otto" remote exists for the current repo, it is added using the Otto settings.
+
+    If the remote repository has not been created, this will initialize it before pushing.
+    """
     # Ensure we're actually in a git working dir
-    project_dir = os.getcwd()
-    while not os.path.exists(os.path.join(project_dir, '.git')):
-        old_project_dir = project_dir
-        project_dir = os.path.dirname(project_dir)
-        if project_dir == old_project_dir: # reached root dir
-            project_dir = None
-            abort("Unable to locate a .git directory")
+    # This will throw an error if not in a git working dir.
+    local("git rev-parse --git-dir")
 
-    # Ensure we don't already have remotes set up.
-    remotes = local("git remote", capture=True)
-    if remotes:
-        abort("This repository already has remotes: "+remotes)
+    target = get_remote_repo_path()
 
-    # Construct the path of the remote repo.
-    repo = repo or os.path.basename(project_dir)
-    if not repo.endswith('.git'):
-        repo = repo+'.git'
-    remote_path = env['otto.git.remote_repo_path']
-    if not remote_path.startswith('/'):
-        abort('"remote_repo_path" must be an absolute path (beginning with "/")')
+    # Check if the "otto" remote is set up. Add it if not.
+    with settings(hide('warnings'), warn_only=True):
+        remotes = local("git remote | grep ^%s$"%remote, capture=True)
+        if remotes.failed:
+            # TODO Figure out how to support multiple protocols, not just ssh
+            local("git remote add %s git+ssh://%s%s" % (remote, env.host_string, target))
 
-    if remote_path.endswith('/'):
-        remote_path = remote_path[:-1]
-
-    target = '/'.join([remote_path, repo])
-
-    if remotefile.exists(target):
-        abort('Server already has a repo "%s". Use `git remote add origin` instead.' % repo)
-
-    run("mkdir -p %s" % target)
-    with cd(target):
-        run("git --bare init")
-
-    # TODO Figure out how to support multiple protocols, not just ssh
-    local("git remote add origin git+ssh://%s%s" % (env.host, target))
-    local("git push --all --set-upstream origin")
+    # PITA: --tags and --all are mutually exclusive, but I need to push both. >:[
+    ensure_remote_repo(target)
+    local("git push %s %s" % (branch, remote))
+    local("git push --tags %s" % remote)
 
 
-def clone_or_update(target,repo,branch='master',use_sudo=False):
+def local_modifications():
+    """Return a list of working copy modifications, parsed from "git status --porcelain".
+
+    Returns None if none found (rather than an empty list).
+
+    Example return value:
+
+        [('M', 'file1.py'), ('A', 'file2.py'), ('D', 'file3.py')]
+    """
+    with settings(hide('warnings'), warn_only=True):
+        # if grep finds something it returns true. We want to invert the logic.
+        check = local("git status --porcelain | grep -v ??", capture=True)
+        if check.succeeded:
+            return re.findall('(?P<status>\w+)\s+(?P<file>.*)', check)
+        else:
+            return None
+
+
+def list_tags(pattern=''):
+    """List all tags matching `pattern`. Returns a Python list."""
+    tags = local("git tag -l '%s' | sort -r" % pattern, capture=True)
+    return re.split('\s+', tags)
+
+
+def clone_or_update(target, repo):
     """Ensure that a directory contains an up-to-date git clone.
 
     `target` is the directory where the clone should live
     `repo` is the git URL to clone if needed
     `branch` is the branch to check out. Default 'master'.
-    `use_sudo` if True, git operations will be performed as superuser.
     """
-    action = sudo if use_sudo else run
-    if remotefile.exists(target+'/.git', verbose=env['verbose']):
+    if remotefile.exists(target+'/.git', verbose=env.get('verbose', False)):
         with cd(target):
-            action('git fetch && git checkout %s' % branch)
+            run('git fetch')
     else:
-        action('mkdir -p %s' % target)
-        action('git clone %s %s' % (repo, target))
-        with cd(target):
-            action('git checkout %s' % branch)
+        run('mkdir -p %s' % target)
+        run('git clone %s %s' % (repo, target))
+
+
+########################################################################
+# Utility functions
+########################################################################
+def get_remote_repo_path():
+    """Construct the path of the remote repo."""
+    repo = env['otto.site']
+    if not repo.endswith('.git'):
+        repo = repo+'.git'
+    return paths.repos(repo)
+
+
+def ensure_remote_repo(target):
+    """Ensure that the given remote git repository exists"""
+    run("mkdir -p %s" % target)
+    with cd(target), settings(hide('warnings'), warn_only=True):
+        git_check = run("git rev-parse --git-dir")
+        if git_check.failed:
+            run("git --bare init")
 
