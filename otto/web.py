@@ -46,6 +46,9 @@ def _install_etc():
     # Install the newly deployed etc/ files. Record the links created so we can check
     # them later.
     with cd(current):
+        # Workaround: fabric 1.4.3 will execute this block even if the cd fails!
+        run("[ `pwd` == '%s' ] && pwd" % current)
+
         sudo("""find etc -type d -print0 | xargs -0 -I '{}' mkdir -p '/{}'
         find etc -type f -print0 | xargs -0 -I '{}' ln -sf '%s/{}' '/{}'
         """ % current)
@@ -149,8 +152,8 @@ def deploy():
         run("""
         if [ -L current ] && [ `readlink current` != `readlink staged` ] ; then
             ln -sfn `readlink current` previous
-            ln -sfn `readlink staged` current
         fi
+        ln -sfn `readlink staged` current
         """)
     _install_etc()
     enable_site()
