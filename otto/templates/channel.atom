@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    {% import 'atom.jinja' as atom %}
+    {{ atom.basic_channel(channel) }}
+    {% if channel.author_detail -%}
+        {{ atom.person('author', author_detail) }}
+    {%- endif %}
+
+    {%- for entry in channel.entries -%}
+    <entry>
+        {{ atom.basic_entry(entry) }}
+    </entry>
+    {% endfor -%}
+</feed>

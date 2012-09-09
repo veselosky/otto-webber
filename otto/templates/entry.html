@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>{% block title %}{{ entry.title|striptags }}{% endblock title%}</title>
+        <meta name="viewport" content="width=device-width">
+    </head>
+    <body>
+        <article class='hentry'>
+        <h1 class='entry-title'>{{ entry.title }}</h1>
+        {% if entry.summary %}
+        <p class="entry-summary">{{ entry.summary }}</p>
+        {% endif %}
+        <div class="entry-content">
+            {{ entry.bodycontent() |safe }}
+        </div>
+        <p class="entry-meta">
+        updated <time class="updated" datetime="{{ entry.sort_date().isoformat() }}">{{ entry.sort_date() }}</time>
+        </p>
+       </article>
+    </body>
+</html>

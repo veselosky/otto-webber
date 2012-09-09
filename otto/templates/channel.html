@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>{% block title %}{{ channel.title|striptags }}{% endblock title%}</title>
+        <meta name="viewport" content="width=device-width">
+    </head>
+    <body>
+        <h1 class='channel-title'>{{ channel.title }}</h1>
+        <div class="entry-list">
+            {% for entry in channel.entries %}
+            <div class="entry-tease">
+                <h2 class="entry-title tease"><a href="{{ entry.url('html') }}">{{ entry.title }}</a></h2>
+                <div class="entry-summary">{{ entry.summary }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </body>
+</html>

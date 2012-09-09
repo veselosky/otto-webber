@@ -1,0 +1,47 @@
+{# Collection of macros for producing Atom output #}
+
+    {# The Atom Person construct, use for Author and Contributor elements. #}
+    {% macro person(person, person_detail) -%}
+    <{{ person }}>
+        <name>{{ person_detail.name }}</name>
+        <uri>{{ person_detail.uri }}</uri>
+        <email>{{ person_detail.email }}</email>
+    </{{ person }}>
+    {%- endmacro %}
+
+    {# Basic channel elements, used by Feed and Source elements. #}
+    {% macro basic_channel(channel) -%}
+    <title>{{ channel.title }}</title>
+    <subtitle>{{ channel.subtitle }}</subtitle>
+    <id>{{ channel.url(absolute=True) }}</id>
+    {% set e = channel.entries[0] -%}
+    <updated>{{ e.sort_date().isoformat() }}</updated>
+    <link rel="alternate" type="text/html" href="{{ channel.url('html') }}" />
+    <link rel="alternate" type="application/json" href="{{ channel.url('json') }}" />
+    <link rel="self" href="{{ channel.url(absolute=True) }}" type="application/atom+xml" />
+    {%- endmacro %}
+
+
+    {# Basic entry elements. #}
+    {% macro basic_entry(entry) -%}
+    <id>{{ entry.url(absolute=True) }}</id>
+    <title>{{ entry.title |striptags }}</title>
+    <summary type="text">{{ entry.summary|striptags }}</summary>
+    {% for topic in entry.topic_list() -%}
+    {% if topic -%}
+    <category term="{{ topic }}"/>
+    {% endif -%}
+    {% endfor -%}
+    {% if entry.published -%}
+    <published>{{ entry.published.isoformat() }}</published>
+    {%- endif %}
+    <updated>{{ entry.sort_date().isoformat() }}</updated>
+    <content type='html'>{{ entry.bodycontent() }}</content>{# auto escaped #}
+
+    {%- if entry.author_detail -%}
+        {{ person('author', entry.author_detail) }}
+    {%- endif -%}
+
+    <link rel="alternate" type="text/html" href="{{ entry.url('html', absolute=True) }}" />
+    <link rel="alternate" type="application/json" href="{{ entry.url('json', absolute=True) }}" />
+    {%- endmacro %}

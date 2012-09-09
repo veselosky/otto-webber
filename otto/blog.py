@@ -9,7 +9,7 @@ is a file of the correct EntryType (see under Inputs below).
 
 All objects are represented as simple dictionaries. This ensures they can
 easily be serialized to and from JSON, the canonical storage format. The
-dictionaries are designed to be compatible with those produced by feedparser_.
+dictionaries are designed to be compatible with those produced by feedparser.
 Consult the feedparser documentation for hints as to useful keys. However,
 arbitrary keys are accepted as generic metadata and passed to your template
 context unchanged, so long as they do not conflict with (or are compatible
@@ -19,14 +19,7 @@ Dictionary keys beginning with an underscore are not stored, but are calculated
 and inserted by the load routines. Such keys are not guaranteed to exist. Do
 not set them yourself.
 
-Dealing with datetimes is currently a massive pain. I haven't decided how to
-deal with them yet. Inputs SHOULD be represented as RFC3339 (i.e. ISO-8601
-formatted) strings. Otto attempts to normalize datetime values to that format,
-but makes no promises. Outputs are not guaranteed to be in any particular
-format, though they MAY be parsable with `dateutil.parser`. The "*_parsed" keys
-provided by feedparser MAY exist, but do not count on it.  A list of fields
-expected to contain datetimes is defined in the module variable
-`DATETIME_FIELDS`. 
+Datetime fields are converted to timezone-aware Python datetime.datetime objects.
 
 Inputs
 ------
@@ -76,174 +69,273 @@ own rather spartan POSH templates (POSH = Plain Old Semantic HTML).
 from datetime import datetime
 from dateutil import tz, parser as dateparser
 from fabric.api import env, lcd, local, require, task as fabtask
+from feedparser import FeedParserDict # WARNING! Private internals!
+import fnmatch
 from jinja2 import Environment, FileSystemLoader
-import json
 import markdown
 import os
 import os.path
-from otto.util import ancestor_of, slurp, dump, json_dump
+from otto.util import ancestor_of, slurp, dump, json_dump, json_load, paths
+try:
+    import simplejson as json
+except ImportError:
+    import json
+import re
+import logging
 
-DATETIME_FIELDS = ['created', 'date', 'expired', 'published', 'updated']
-# TODO Factor out a date normalization function.
-
-
-# base_dir here is really the DocRoot.
-# base_dir and base_url feel like hacks.
-# TODO Rationalize the filepath and urlpath for Channel and Entry objects.
-def load_channel(path, base_dir, base_url):
-    """Return a channel dict loaded from the given path"""
-    # Path normalization
-    filename = path
-    if os.path.isdir(filename):
-        filename = os.path.join(filename, 'channel.json')
-    if not os.path.exists(filename):
-        raise ValueError('Cannot load channel from non-existent path "%s"' % filename)
-
-    channel = json.loads(slurp(filename))
-    channel['_filename'] = filename
-    channel['_dirname'] = os.path.dirname(filename)
-    channel['_path'] = os.path.relpath(channel['_dirname'], base_dir)
-    channel['_url'] = base_url if channel['_path'] == '.' else base_url+channel['_path']+'/'
-    # TODO Normalize datetime fields in the Channel object.
-    # TODO Return Channel as FeedParserDict
-    return channel
+DEFAULT_CONFIG = {
+    'otto.blog.html_entry_template': 'entry.html',
+    'otto.blog.html_channel_template': 'channel.html',
+    'otto.blog.atom_entry_template': 'entry.atom',
+    'otto.blog.atom_channel_template': 'channel.atom',
+    'otto.blog.template_dir': os.path.join( os.path.dirname(__file__), 'templates')
+    }
+for k, v in DEFAULT_CONFIG.iteritems():
+    env.setdefault(k, v)
 
 
-def load_entry_markdown(filename):
-    """Return an entry dict loaded from the given path."""
-    # Path normalization
-    basename, ext = os.path.splitext(filename)
-    channel_dir = ancestor_of(filename, containing='channel.json')
-
-    # Do the parsing
-    md = markdown.Markdown(
-            extensions=['codehilite', 'extra', 'meta'],
-            output_format='html4',
+# Module cache, only init Jinja once during run
+jinja = None
+def get_jinja():
+    global jinja
+    if jinja == None:
+        template_dirs = [ env['otto.blog.template_dir'] ]
+        if env.has_key('otto.template_dir'):
+            template_dirs += env['otto.template_dir']
+        jinja = Environment(
+            loader=FileSystemLoader(template_dirs),
+            extensions=['jinja2.ext.loopcontrols', 'jinja2.ext.autoescape'],
+            autoescape=True,
             )
-    text = slurp(filename)
-    body = md.convert(text)
-    metadata = md.Meta
+    return jinja
 
-    # Markdown makes every value a list, just in case. I only want lists if the
-    # thing claims to be a list.
-    entry = {}
-    for k,v in metadata.iteritems():
-        if len(v) == 1 and not k.endswith('_list'):
-            entry[k] = v[0]
+
+DATETIME_FIELDS = ['created', 'expired', 'published', 'updated']
+def normalize_datetimes(thing):
+    # Use a timezone-aware default. Otherwise would get naive datetimes.
+    default = datetime.now(tz.gettz()).replace(hour=0,minute=0,second=0,microsecond=0)
+    for k in DATETIME_FIELDS:
+        if thing.has_key(k):
+            try:
+                dt = dateparser.parse(thing[k], default=default)
+            except ValueError:
+                continue
+            thing[k] = dt
+            if not thing.has_key(k+'_parsed'):
+                thing[k+'_parsed'] = dt.timetuple()
+
+
+class BlogThing(FeedParserDict):
+    """Code shared by channels and entries."""
+
+    def channel(self):
+        """Return the channel containing the Thing. If the Thing IS a channel, returns itself."""
+        if self['_metafile'].endswith('channel.json'):
+            return self
+        channel_dir = ancestor_of(self['_metafile'], containing='channel.json')
+        return Channel.load_json(channel_dir)
+
+    @classmethod
+    def load_json(cls, filename):
+        """Create an object and initialize from JSON file."""
+        thing = cls( json_load(filename) )
+
+        # These properties are contextual, therefore calculated and not stored.
+        mtime = datetime.utcfromtimestamp(os.path.getmtime(filename))
+        thing['_modified'] = mtime
+        thing['_metafile'] = filename
+        # TODO Media-link entries as defined in AtomPub will have a different contentfile
+        if filename.endswith('channel.json'):
+            thing['_contentfile'] = os.path.join( os.path.dirname(filename), 'index.json')
         else:
-            entry[k] = v
-        # TODO Move entry datetime normalization to shared function.
-        # For any fields containing datetimes, ensure they are fully qualified
-        # RFC3339 formatted strings (input is likely to contain date only with
-        # no timezone info, e.g. '2011-09-30').
-        if k in DATETIME_FIELDS:
-            default = datetime.now(tz.gettz()).replace(hour=0,minute=0,second=0,microsecond=0)
-            dt = dateparser.parse(entry[k], default=default)
-            entry[k] = dt.isoformat()
+            thing['_contentfile'] = filename
 
-    # TODO Make entry.content compatible with feedparser's entry.content
-    # http://packages.python.org/feedparser/reference-entry-content.html
-    entry['content'] = body
+        normalize_datetimes(thing)
+        return thing
 
-    # These properties are contextual, therefore calculated and not stored.
-    mtime = datetime.utcfromtimestamp(os.path.getmtime(filename)).isoformat()+'Z'
-    entry['_modified'] = mtime
-    entry['_filename'] = filename
-    entry['_path'] = os.path.relpath(basename, channel_dir)
-    # TODO Return Entry as FeedParserDict
-    return entry
+    def save_json(self, outfile=None):
+        """Write the JSON data (back) to disk."""
+        outfile = outfile or self['_metafile']
+        json_dump(self, outfile)
+
+    def render_to(self, format='html', context={}, outfile=None):
+        """Output an HTML file."""
+        if not outfile:
+            outfile, ext = os.path.splitext(self['_contentfile'])
+            outfile = outfile + '.' + format
+        # TODO Only write outfile if entry file is newer
+        template = self.get_template(format)
+        dump(template.render(self.context(context)), outfile)
+
+    def context(self, context={}):
+        return context
 
 
-# TODO Create md2json function.
-# TODO Create json2atom function.
-# TODO Create json2html function.
+class Channel(BlogThing):
 
-# TODO INCREMENTAL BUILD
-# Allow a datetime to be passed. Only files touched after that time will be processed.
-# This can be stored in the Channel.updated field.
-# First find all the markdown files, and convert them to JSON ONLY if they
-# are newer than the existing JSON file (or no JSON file exists).
-# Second, walk the blog DEPTH FIRST (not TopDown as before).
-# For each step:
-#   - Process all the JSON entries, producing HTML and Atom output ONLY if needed.
-#   - Append each JSON entry processed to the tempChannellist.
-#   - If thisdir is the Channel:
-#       - If build is incremental, merge loaded ChannelList with tempChannelList
-#       - generate Channel outputs
-#       - PURGE the tempChannelList
+    @classmethod
+    def load_json(cls, filename):
+        """Create an object and initialize from JSON file."""
+        if os.path.isdir(filename):
+            filename = os.path.join(filename, 'channel.json')
+        return super(Channel, cls).load_json(filename)
 
+    def save_json(self, outfile=None):
+        """Write the JSON data (back) to disk."""
+        # Default save location is metadata file, no entries there
+        entries = self.pop('entries', None)
+        super(Channel, self).save_json()
+
+        # We also produce the index.json which does have the entries
+        if entries:
+            self['entries'] = entries
+            super(Channel, self).save_json(self['_contentfile'])
+ 
+    def context(self, context={}):
+        context.update({ "channel": self })
+        return context
+
+    def get_template(self, format='html'):
+        """Returns a Jinja2 template object that will output the requested format."""
+        template_name = self.get(format+'_template', None) or \
+            env['otto.blog.%s_channel_template' % format]
+        jinja = get_jinja()
+        return jinja.get_template(template_name)
+
+    def url(self, absolute=False):
+        """URL to the channel, relative to /."""
+        channelpath = os.path.dirname(self.channel()['_metafile'])
+        relpath = os.path.relpath(paths.build_dir('htdocs'), channelpath)
+        if relpath == '.' and absolute:
+            return 'http://%s/' % env['otto.site']
+        if absolute:
+            return 'http://%s/%s/' % (env['otto.site'], relpath)
+        return relpath+'/'
+
+
+class Entry(BlogThing):
+
+    def sort_date(e):
+        return e.get('updated', None) or e.get('published', None) or e.get('_modified', None)
+
+    @staticmethod
+    def sort_key(e):
+        """Key function to be passed to list.sort"""
+        return e.sort_date()
+
+    @classmethod
+    def load_markdown(cls, filename):
+        """Return an Entry loaded from the given path."""
+        md = markdown.Markdown(
+                extensions=['codehilite', 'extra', 'meta'],
+                output_format='html4',
+                )
+        body = md.convert( slurp(filename) )
+        metadata = md.Meta
+
+        # Markdown makes every value a list, just in case. I only want lists if the
+        # thing claims to be a list.
+        entry = cls()
+        for k,v in metadata.iteritems():
+            if len(v) == 1 and not k.endswith('_list'):
+                entry[k] = v[0]
+            else:
+                entry[k] = v
+
+        normalize_datetimes(entry)
+
+        # http://packages.python.org/feedparser/reference-entry-content.html
+        entry['content'] = [ { 'value': body, 'type': 'text/html' } ]
+
+        # http://packages.python.org/feedparser/reference-entry-tags.html
+        tag_list = re.split(r',?\s+', entry.pop('tags', ''))
+        entry['tags'] = [ {'term': tag, 'scheme':'', 'label': tag} for tag in tag_list ]
+
+        # These properties are contextual, therefore calculated and not stored.
+        entry['_modified'] = datetime.utcfromtimestamp(os.path.getmtime(filename))
+        # The JSON file is canonical.
+        entry['_sourcefile'] = filename
+        entry['_metafile'] = entry['_contentfile'] = re.sub(r'\.md$', '.json', filename)
+        return entry
+
+    def get_template(self, format='html'):
+        """Returns a Jinja2 template object that will output the requested format."""
+        template_name = self.get(format+'_template', None) or \
+            self.channel().get(format+'_entry_template', None) or \
+            env['otto.blog.%s_entry_template' % format]
+        jinja = get_jinja()
+        return jinja.get_template(template_name)
+
+    def context(self, context={}):
+        context.update({'entry':self, 'channel':self.channel})
+        return context
+
+    def bodycontent(self):
+        """All the content that's fit to print."""
+        return ' '.join( [ x['value'] for x in self['content'] ] )
+
+    def url(self, format=None, absolute=False):
+        """URL to the entry, relative to its channel."""
+        channelpath = os.path.dirname(self.channel()['_metafile'])
+        relpath = os.path.relpath(self['_contentfile'], channelpath)
+        url, ext = os.path.splitext(relpath)
+        if format:
+            url = url + '.' + format
+        if absolute:
+            return self.channel().url(absolute) + url
+        return url
+
+    def topic_list(self):
+        """Simple list of "topic" tags as strings (whereas `tags` gives you dicts)."""
+        if self.has_key('tags'):
+            return [ tag['term'] for tag in self['tags'] ]
+        else:
+            return []
+
+
+# TODO 0.5 Accept date argument for incremental build
 @fabtask
-def build_blog(blogdir):
+def build_blog(source_dir, dest_dir):
     """Build the blog"""
-    blogname = os.path.basename(blogdir)
-    entries_for_channel = {} # blog can have multiple channels
+    require('otto.build_dir', 'otto.site')
+    if not source_dir.endswith('/'):
+        source_dir += '/'
+    build_dir = paths.build_dir(dest_dir)
 
-    # All the directories and paths we will need for ins and outs
-    require('otto.build_dir', 'otto.template_dir', 'otto.site')
-    build_dir = os.path.join(env['otto.build_dir'], 'htdocs', blogname)
-    template_dir = env['otto.template_dir']
-    # FIXME How to tell if absolute links should be http or https?
-    blog_url = 'http://%s/%s/' % (env['otto.site'], blogname)
-
-    test_root = os.path.dirname(env['real_fabfile'])
-    with lcd(test_root):
+    logging.info("Processing " + source_dir)
+    with lcd(paths.local_workspace()):
         local('mkdir -p %s' % build_dir)
-        local('cp -a %s %s' % (blogdir+'/', build_dir))
+        local('cp -a %s %s' % (source_dir, build_dir))
 
-    jinja = Environment(loader=FileSystemLoader(template_dir),
-            extensions=['jinja2.ext.loopcontrols', 'jinja2.ext.autoescape'])
-
+    # Walk the dir looking for markdown files and convert to JSON
     for thisdir, subdirs, files in os.walk(build_dir):
-        channel_dir = ancestor_of(thisdir, containing='channel.json')
-        channel = load_channel(channel_dir, build_dir, blog_url)
-        entries_for_channel.setdefault(channel['_filename'], [])
-        for entryfile in files:
-            if not entryfile.endswith('.md'):
+        for mdfile in fnmatch.filter(files, '*.md'):
+            # TODO Only write outfile if md file is newer
+            mdfilename = os.path.join(thisdir, mdfile)
+            entry = Entry.load_markdown(mdfilename)
+            entry.save_json()
+
+    # Now walk it again, converting each JSON file to HTML and Atom
+    entries = []
+    for thisdir, subdirs, files in os.walk(build_dir, topdown=False):
+        for entryfile in fnmatch.filter(files, '*.json'):
+            if entryfile == 'channel.json':
                 continue
             entrypath = os.path.join(thisdir, entryfile)
-            outpath, ext = os.path.splitext(entrypath)
+            entry = Entry.load_json(entrypath)
+            entries.append(entry)
+            entry.render_to('html')
+            entry.render_to('atom')
 
-            # Load entry, Add to entrylist for its channel
-            entry = load_entry_markdown(entrypath)
-            entries_for_channel[channel['_filename']].append(entry)
+        # Since this is a depth-first crawl, if we have reached the channel dir,
+        # we have already processed all the entries in this channel.
+        if os.path.exists( os.path.join(thisdir, 'channel.json')):
+            channel = Channel.load_json(thisdir)
 
-            # TODO Abstraction around Formatters, so you can configure any kind
-            # of output using a plugin.
-
-            # write JSON output
-            json_dump(entry, outpath+'.json')
-
-            # Write HTML output (entry or channel may specify a template)
-            template_name = entry.get('template', None) or \
-                channel.get('entry_template', None) or \
-                env['otto.blog.entry_template']
-            template = jinja.get_template(template_name)
-            context = {'entry':entry, 'channel':channel}
-            dump(template.render(context), outpath+'.html')
-
-    # Now we've accumulated all the entries. Write the channel indexes.
-    for channelfile, entries in entries_for_channel.iteritems():
-        channel = load_channel(channelfile, build_dir, blog_url)
-        outpath = os.path.join(channel['_dirname'], 'index')
-
-        def entry_sort_key(e):
-            return e.get('updated', None) or e.get('published', None) or e.get('date', None)
-        # sort entries reverse chrono
-        entries.sort(key=entry_sort_key, reverse=True)
-        channel['entries'] = entries
-
-        # dump index.json
-        json_dump(channel, outpath+'.json')
-
-        context = {'channel': channel}
-
-        # render index.html template
-        template_name = channel.get('index_template', None) or \
-            env['otto.blog.channel_template']
-        template = jinja.get_template(template_name)
-        dump(template.render(context), outpath+'.html')
-
-        # render FEED template(s)
-        feed_template = jinja.get_template('index.atom')
-        dump(feed_template.render(context), outpath+'.atom')
+            # sort entries reverse chrono
+            entries.sort(key=Entry.sort_key, reverse=True)
+            channel['entries'] = entries
+            channel.save_json()
+            channel.render_to('html')
+            channel.render_to('atom')
 

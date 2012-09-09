@@ -1,8 +1,10 @@
 import codecs
+import datetime
+import decimal
 import json
 import os.path
+import time
 
-from datetime import datetime
 from fabric.api import env
 
 ########################################################################
@@ -53,7 +55,7 @@ class paths(object):
 
 
 def make_timestamp():
-    return datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+    return datetime.datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 
 ########################################################################
 # Functions for blog.py
@@ -93,13 +95,37 @@ def strip_private_keys(fromdict):
     return save_copy
 
 class Encoder(json.JSONEncoder):
+    """JSON encoder that won't choke on feedparser objects."""
     def default(self, o):
-        if hasattr(o, 'isoformat'):
+        # See "Date Time String Format" in the ECMA-262 specification.
+        if isinstance(o, datetime.datetime):
+            r = o.isoformat()
+            if o.microsecond:
+                r = r[:23] + r[26:]
+            if r.endswith('+00:00'):
+                r = r[:-6] + 'Z'
+            return r
+        elif isinstance(o, datetime.date):
             return o.isoformat()
+        elif isinstance(o, datetime.time):
+            r = o.isoformat()
+            if o.microsecond:
+                r = r[:12]
+            return r
+        elif isinstance(o, decimal.Decimal):
+            return str(o)
+        elif isinstance(o, time.struct_time):
+            return tuple(o)
         else:
             return super(Encoder, self).default(o)
 
+
 def json_dump(this, outpath):
     """Save a dict as JSON to the `outfile` using UTF-8 encoding, removing "private" keys."""
-    dump(json.dumps(strip_private_keys(this), ensure_ascii=False, cls=Encoder), outpath)
+    dump(json.dumps(strip_private_keys(this), ensure_ascii=False, cls=Encoder, indent=4), outpath)
+
+def json_load(filename):
+    """Load a JSON object from a file, given the filename."""
+    with codecs.open(filename, 'r', 'utf-8') as f:
+        return json.load(f)
 
