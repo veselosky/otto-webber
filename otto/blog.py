@@ -153,6 +153,43 @@ class BlogThing(FeedParserDict):
         normalize_datetimes(thing)
         return thing
 
+    @classmethod
+    def load_markdown(cls, filename):
+        """Return an instance of BlogThing loaded from the given markdown file."""
+        md = markdown.Markdown(
+                extensions=['codehilite', 'extra', 'meta'],
+                output_format='html4',
+                )
+        body = md.convert( slurp(filename) )
+        metadata = md.Meta
+
+        # Markdown makes every value a list, just in case. I only want lists if the
+        # thing claims to be a list.
+        thing = cls()
+        for k,v in metadata.iteritems():
+            if len(v) == 1 and not k.endswith('_list'):
+                thing[k] = v[0]
+            else:
+                thing[k] = v
+
+        normalize_datetimes(thing)
+
+        # http://packages.python.org/feedparser/reference-thing-content.html
+        thing['content'] = [ { 'value': body, 'type': 'text/html' } ]
+
+        # http://packages.python.org/feedparser/reference-thing-tags.html
+        tag_list = re.split(r',?\s+', thing.pop('tags', ''))
+        thing['tags'] = [ {'term': tag, 'scheme':'', 'label': tag} for tag in tag_list ]
+
+        thing['_modified'] = datetime.utcfromtimestamp(os.path.getmtime(filename))
+        thing['sourcefile'] = filename
+        thing['_metafile'] = re.sub(r'\.md$', '.json', filename)
+        if filename.endswith('channel.md'):
+            thing['_contentfile'] = os.path.join( os.path.dirname(filename), 'index.json')
+        else:
+            thing['_contentfile'] = thing['_metafile']
+        return thing
+
     def save_json(self, outfile=None):
         """Write the JSON data (back) to disk."""
         outfile = outfile or self['_metafile']
@@ -169,6 +206,14 @@ class BlogThing(FeedParserDict):
 
     def context(self, context={}):
         return context
+
+    def bodycontent(self):
+        """All the content that's fit to print.
+
+        Contrary to all feed specifications, I allow channels to have content
+        too. This makes for handy introductory text on the channel index page.
+        """
+        return ' '.join( [ x['value'] for x in self['content'] ] )
 
 
 class Channel(BlogThing):
@@ -223,41 +268,6 @@ class Entry(BlogThing):
         """Key function to be passed to list.sort"""
         return e.sort_date()
 
-    @classmethod
-    def load_markdown(cls, filename):
-        """Return an Entry loaded from the given path."""
-        md = markdown.Markdown(
-                extensions=['codehilite', 'extra', 'meta'],
-                output_format='html4',
-                )
-        body = md.convert( slurp(filename) )
-        metadata = md.Meta
-
-        # Markdown makes every value a list, just in case. I only want lists if the
-        # thing claims to be a list.
-        entry = cls()
-        for k,v in metadata.iteritems():
-            if len(v) == 1 and not k.endswith('_list'):
-                entry[k] = v[0]
-            else:
-                entry[k] = v
-
-        normalize_datetimes(entry)
-
-        # http://packages.python.org/feedparser/reference-entry-content.html
-        entry['content'] = [ { 'value': body, 'type': 'text/html' } ]
-
-        # http://packages.python.org/feedparser/reference-entry-tags.html
-        tag_list = re.split(r',?\s+', entry.pop('tags', ''))
-        entry['tags'] = [ {'term': tag, 'scheme':'', 'label': tag} for tag in tag_list ]
-
-        # These properties are contextual, therefore calculated and not stored.
-        entry['_modified'] = datetime.utcfromtimestamp(os.path.getmtime(filename))
-        # The JSON file is canonical.
-        entry['_sourcefile'] = filename
-        entry['_metafile'] = entry['_contentfile'] = re.sub(r'\.md$', '.json', filename)
-        return entry
-
     def get_template(self, format='html'):
         """Returns a Jinja2 template object that will output the requested format."""
         template_name = self.get(format+'_template', None) or \
@@ -269,10 +279,6 @@ class Entry(BlogThing):
     def context(self, context={}):
         context.update({'entry':self, 'channel':self.channel})
         return context
-
-    def bodycontent(self):
-        """All the content that's fit to print."""
-        return ' '.join( [ x['value'] for x in self['content'] ] )
 
     def url(self, format=None, absolute=False):
         """URL to the entry, relative to its channel."""
