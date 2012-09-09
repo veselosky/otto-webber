@@ -101,7 +101,7 @@ def get_jinja():
     if jinja == None:
         template_dirs = [ env['otto.blog.template_dir'] ]
         if env.has_key('otto.template_dir'):
-            template_dirs += env['otto.template_dir']
+            template_dirs.insert(0, env['otto.template_dir'])
         jinja = Environment(
             loader=FileSystemLoader(template_dirs),
             extensions=['jinja2.ext.loopcontrols', 'jinja2.ext.autoescape'],
