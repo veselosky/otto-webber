@@ -53,7 +53,7 @@ the server. Otto will then rsync your built site to the staging area.
 When you are ready, execute `fab otto.web.deploy`. Otto will make your staged site
 "live" by manipulating symbolic links and, if necessary, reloading your web server.
 """
-__version__ = '0.4.0'
+__version__ = '0.4.2'
 
 from fabric.api import env
 
