@@ -83,7 +83,20 @@ class Precise(object):
     @property
     def nginx_server(self):
         """Setup for nginx"""
-        return '', ['nginx'], ''
+        return '', ['nginx'], '/etc/init.d/nginx start'
+
+    @property
+    def nodejs_server(self):
+        pre = ''
+        pkgs = ['stow']
+        post = '''
+        mkdir -p /usr/local/Library
+        cd /usr/local/Library
+        wget http://nodejs.org/dist/v0.8.18/node-v0.8.18-linux-x86.tar.gz
+        tar -xzf node-v0.8.18-linux-x86.tar.gz
+        stow node-v0.8.18-linux-x86
+        '''
+        return (pre, pkgs, post)
 
     @property
     def wsgi_server(self):
