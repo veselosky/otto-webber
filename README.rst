@@ -1,3 +1,11 @@
+RETIRED
+========
+
+This software is no long used or maintained. It remains here for historical
+purposes only. For those interested, I moved to using Ansible for infrastructure
+automation, and various other tools for static site generation (I seem to pick
+a new tool for every site).
+
 Otto Webber - A different kind of web content management system
 ===============================================================
 
